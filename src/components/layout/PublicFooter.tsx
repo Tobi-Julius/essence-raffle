@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
 
 export function PublicFooter() {
-  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@essencestore.example";
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "shopwithessencestore@gmail.com";
   return (
     <footer className="border-t border-neutral-100 bg-neutral-50">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
