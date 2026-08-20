@@ -1,26 +1,103 @@
 @import "tailwindcss";
 
 :root {
+  /* Essence Store brand — green & white, corporate but approachable. */
+  --color-brand-50: #f0fbf1;
+  --color-brand-100: #dbf5dd;
+  --color-brand-200: #b8eabd;
+  --color-brand-300: #86d890;
+  --color-brand-400: #4fbd5e;
+  --color-brand-500: #2fa23f;
+  --color-brand-600: #1f8530;
+  --color-brand-700: #1a6a29;
+  --color-brand-800: #175424;
+  --color-brand-900: #14451f;
+  --color-brand-950: #08260f;
+
+  --color-neutral-50: #f8faf8;
+  --color-neutral-100: #eef2ee;
+  --color-neutral-200: #dde4dd;
+  --color-neutral-300: #c2cdc2;
+  --color-neutral-400: #97a897;
+  --color-neutral-500: #718571;
+  --color-neutral-600: #566856;
+  --color-neutral-700: #435243;
+  --color-neutral-800: #313d31;
+  --color-neutral-900: #202821;
+  --color-neutral-950: #131813;
+
+  --color-success-500: #2fa23f;
+  --color-success-100: #dbf5dd;
+  --color-warning-500: #d97706;
+  --color-warning-100: #fef3c7;
+  --color-error-500: #dc2626;
+  --color-error-100: #fee2e2;
+  --color-info-500: #2563eb;
+  --color-info-100: #dbeafe;
+
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: var(--color-neutral-900);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-brand-50: var(--color-brand-50);
+  --color-brand-100: var(--color-brand-100);
+  --color-brand-200: var(--color-brand-200);
+  --color-brand-300: var(--color-brand-300);
+  --color-brand-400: var(--color-brand-400);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  --color-brand-700: var(--color-brand-700);
+  --color-brand-800: var(--color-brand-800);
+  --color-brand-900: var(--color-brand-900);
+  --color-brand-950: var(--color-brand-950);
+
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
+  --color-neutral-950: var(--color-neutral-950);
+
+  --color-success: var(--color-success-500);
+  --color-success-soft: var(--color-success-100);
+  --color-warning: var(--color-warning-500);
+  --color-warning-soft: var(--color-warning-100);
+  --color-error: var(--color-error-500);
+  --color-error-soft: var(--color-error-100);
+  --color-info: var(--color-info-500);
+  --color-info-soft: var(--color-info-100);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.focus-ring {
+  outline: none;
+}
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
 }

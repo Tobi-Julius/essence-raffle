@@ -1,0 +1,73 @@
+rules_version = '2';
+
+/**
+ * Payment receipts are the most sensitive asset in this system: a
+ * participant may only read/write their own receipt, at the exact
+ * (raffleId, userId, paymentId) path the app generates — never an
+ * arbitrary path — and only admins may read anyone else's. Everything else
+ * here (raffle banners, prize photos/videos) is public-read, admin-write
+ * marketing content.
+ *
+ * Enable Firebase App Check enforcement for Cloud Storage in the Firebase
+ * Console; it complements but does not replace these rules.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (request.auth.token.role == 'admin' || request.auth.token.role == 'super_admin');
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // ---- payment receipts -------------------------------------------------
+    match /receipts/{raffleId}/{userId}/{paymentId}/{fileName} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.size <= 8 * 1024 * 1024
+        && (
+          request.resource.contentType == 'image/jpeg' ||
+          request.resource.contentType == 'image/png' ||
+          request.resource.contentType == 'application/pdf'
+        );
+
+      // Receipts are immutable once uploaded — a rejected payment gets a
+      // brand-new payment record (and therefore a new path) on re-submission
+      // rather than overwriting evidence of the earlier attempt.
+      allow update, delete: if false;
+    }
+
+    // ---- raffle banner images ---------------------------------------------
+    match /raffles/{raffleId}/{fileName} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage() && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // ---- prize photo ---------------------------------------------------
+    match /prizes/{raffleId}/image.{ext} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage() && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // ---- prize video ---------------------------------------------------
+    match /prizes/{raffleId}/video.{ext} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.contentType.matches('video/.*')
+        && request.resource.size <= 50 * 1024 * 1024;
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

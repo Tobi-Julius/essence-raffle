@@ -5,6 +5,15 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    rules: {
+      // This codebase intentionally fetches data with the Firestore client
+      // SDK inside useEffect (the standard pattern for a client-rendered
+      // Firebase app) rather than Suspense/`use()`. That's a deliberate
+      // architecture choice, not the bug this experimental rule assumes.
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -12,6 +21,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "functions/**",
   ]),
 ]);
 

@@ -1,0 +1,178 @@
+rules_version = '2';
+
+/**
+ * Security model, in one sentence: participants may only ever create their
+ * own profile and read their own money/eligibility-affecting documents —
+ * every write that touches payment status, entry eligibility, winner
+ * selection, prizes, terms publication, or roles happens exclusively inside
+ * a Cloud Function (functions/src/**), which uses the Admin SDK and is
+ * therefore NOT subject to these rules at all. These rules are the backstop
+ * for direct client SDK access, not the primary authorization layer for
+ * those operations — the Cloud Functions re-check everything themselves.
+ *
+ * Enable Firebase App Check enforcement for Cloud Firestore in the Firebase
+ * Console for this project; it is a defense-in-depth layer against
+ * unauthorized clients and is not a substitute for the checks below.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myRole() {
+      return isSignedIn() ? request.auth.token.role : null;
+    }
+
+    function isAdmin() {
+      return myRole() == 'admin' || myRole() == 'super_admin';
+    }
+
+    function isSuperAdmin() {
+      return myRole() == 'super_admin';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function unchangedExcept(allowedKeys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedKeys);
+    }
+
+    // ---------------------------------------------------------------------
+    // users
+    // ---------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      // Registration creates this doc client-side; role/isActive are forced
+      // to safe defaults here so a client can never self-assign a role.
+      allow create: if isOwner(userId)
+        && request.resource.data.role == 'participant'
+        && request.resource.data.isActive == true
+        && request.resource.data.keys().hasAll(['fullName', 'email', 'phoneNumber', 'role', 'isActive', 'createdAt', 'updatedAt']);
+
+      // Only the owner may update, and only non-sensitive contact fields.
+      // role/isActive can ONLY change via the setUserRole/setUserActive
+      // Cloud Functions (Admin SDK writes bypass these rules).
+      allow update: if isOwner(userId) && unchangedExcept(['fullName', 'phoneNumber', 'photoURL', 'updatedAt']);
+
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // raffles
+    // ---------------------------------------------------------------------
+    match /raffles/{raffleId} {
+      // Applies per-candidate-document to both get and list requests: a
+      // public list query (which never filters for status == 'DRAFT')
+      // only ever has non-draft candidates, so this passes; an admin's
+      // unfiltered "all raffles" query passes via isAdmin() regardless.
+      allow get, list: if resource.data.status != 'DRAFT' || isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.status == 'DRAFT'
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.hasWinner == false
+        && request.resource.data.stats.totalRegistrations == 0;
+
+      // Content edits only, only while still draft/upcoming. Status,
+      // stats, hasWinner, currentWinnerEntryId, activeTermsId/Version are
+      // exclusively Cloud-Function-owned fields.
+      allow update: if isAdmin()
+        && resource.data.status in ['DRAFT', 'UPCOMING']
+        && unchangedExcept([
+          'name', 'nameLower', 'slug', 'shortDescription', 'fullDescription',
+          'bannerPath', 'bannerUrl', 'thumbnailPath', 'thumbnailUrl',
+          'schedule', 'payment', 'eligibility', 'entryConfig', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && resource.data.status == 'DRAFT';
+
+      match /terms/{termsId} {
+        allow get, list: if resource.data.status == 'active' || isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.status == 'draft'
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.raffleId == raffleId;
+        // Publishing/archiving only via the publishTerms Cloud Function.
+        allow update: if isAdmin()
+          && resource.data.status == 'draft'
+          && unchangedExcept(['contentJson', 'contentHtml', 'updatedAt']);
+        allow delete: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // prizes — exactly one document per raffle, doc id === raffleId
+    // ---------------------------------------------------------------------
+    match /prizes/{raffleId} {
+      allow get, list: if true;
+      allow create: if isAdmin()
+        && request.resource.data.raffleId == raffleId
+        && request.resource.data.status == 'available';
+      // Claim status/claimedBy/verifiedBy are exclusively set by the
+      // claimPrize Cloud Function.
+      allow update: if isAdmin()
+        && unchangedExcept(['name', 'description', 'imagePath', 'imageUrl', 'videoPath', 'videoUrl', 'value', 'currency', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // entries — created/mutated exclusively by Cloud Functions
+    // ---------------------------------------------------------------------
+    match /entries/{entryId} {
+      // For `list`, Firestore evaluates this rule against every document
+      // the query could possibly return; because the app always queries
+      // this collection with a `where('userId','==',uid)` filter for
+      // participant reads, every candidate document already satisfies the
+      // ownership check below. Admin queries (no userId filter) instead
+      // satisfy the isAdmin() branch, which holds for every candidate.
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // payments — created/mutated exclusively by Cloud Functions
+    // ---------------------------------------------------------------------
+    match /payments/{paymentId} {
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Internal uniqueness registries — never read or written by clients.
+    match /paymentReferences/{reference} {
+      allow read, write: if false;
+    }
+    match /counters/{raffleId} {
+      allow read, write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // draws — public read for the live draw screen; Cloud Functions only write
+    // ---------------------------------------------------------------------
+    match /draws/{drawId} {
+      allow get, list: if true;
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // winners — public read (masked display name only, by design); Cloud
+    // Functions only write. Disqualification/redraw never delete a record.
+    // ---------------------------------------------------------------------
+    match /winners/{winnerId} {
+      allow get, list: if true;
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------
+    // auditLogs — append-only, admin-readable, never client-writable
+    // ---------------------------------------------------------------------
+    match /auditLogs/{logId} {
+      allow get, list: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
