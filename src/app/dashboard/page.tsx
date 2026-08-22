@@ -29,12 +29,14 @@ function DashboardHome() {
   useEffect(() => {
     if (!user) return;
     listMyEntries(user.uid).then(async (entries) => {
-      const raffles = await Promise.all(entries.map((e) => getRaffle(e.raffleId)));
+      const raffles = await Promise.all(
+        entries.map((e) => getRaffle(e.raffleId)),
+      );
       setItems(entries.map((entry, i) => ({ entry, raffle: raffles[i] })));
     });
   }, [user]);
 
-  if (!items) return <PageSpinner />;
+  // if (!items) return <PageSpinner />;
 
   return (
     <div>
@@ -52,15 +54,19 @@ function DashboardHome() {
       )}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-900">My Raffles</h1>
-          <p className="mt-1 text-sm text-neutral-500">Track your entries from registration to the draw.</p>
+          <h1 className="text-2xl font-semibold text-neutral-900">
+            My Raffles
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            Track your entries from registration to the draw.
+          </p>
         </div>
         <Link href="/raffles">
           <Button variant="outline">Browse raffles</Button>
         </Link>
       </div>
 
-      {items.length === 0 ? (
+      {items?.length === 0 ? (
         <div className="mt-8">
           <EmptyState
             icon={Gift}
@@ -75,7 +81,7 @@ function DashboardHome() {
         </div>
       ) : (
         <div className="mt-6 space-y-3">
-          {items.map(({ entry, raffle }) => (
+          {items?.map(({ entry, raffle }) => (
             <Link key={entry.id} href={`/dashboard/raffles/${entry.raffleId}`}>
               <Card className="transition hover:border-brand-300">
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
@@ -86,8 +92,12 @@ function DashboardHome() {
                       <Gift className="h-5 w-5 text-neutral-400" />
                     )}
                     <div>
-                      <p className="font-medium text-neutral-900">{raffle?.name ?? "Raffle"}</p>
-                      <p className="text-xs text-neutral-500">Entry {entry.entryNumber}</p>
+                      <p className="font-medium text-neutral-900">
+                        {raffle?.name ?? "Raffle"}
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        Entry {entry.entryNumber}
+                      </p>
                     </div>
                   </div>
                   <EntryStatusBadge status={entry.status} />

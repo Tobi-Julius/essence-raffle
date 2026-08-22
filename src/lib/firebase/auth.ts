@@ -20,8 +20,15 @@ import type { RegisterInput } from "@/lib/validation/schemas";
  * sets the custom claim used by security rules.
  */
 export async function registerUser(input: RegisterInput): Promise<void> {
-  const credential = await createUserWithEmailAndPassword(auth, input.email, input.password);
-  await updateProfile(credential.user, { displayName: input.fullName });
+  const credential = await createUserWithEmailAndPassword(
+    auth,
+    input.email,
+    input.password,
+  );
+
+  await updateProfile(credential.user, {
+    displayName: input.fullName,
+  });
   await setDoc(doc(db, "users", credential.user.uid), {
     fullName: input.fullName,
     email: input.email,
@@ -35,7 +42,10 @@ export async function registerUser(input: RegisterInput): Promise<void> {
   await sendEmailVerification(credential.user);
 }
 
-export async function loginUser(email: string, password: string): Promise<void> {
+export async function loginUser(
+  email: string,
+  password: string,
+): Promise<void> {
   await signInWithEmailAndPassword(auth, email, password);
 }
 

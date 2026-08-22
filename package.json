@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore \"pnpm exec vitest run src/lib/firebase/firestore.rules.test.ts\"",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
