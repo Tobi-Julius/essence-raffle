@@ -73,7 +73,9 @@ function toInput(values: RaffleFormValues): RaffleCreateInput | null {
       },
       eligibility: {
         type: values.eligibilityType,
-        groupLabel: values.eligibilityGroupLabel || undefined,
+        ...(values.eligibilityGroupLabel
+          ? { groupLabel: values.eligibilityGroupLabel }
+          : {}),
         description: values.eligibilityDescription,
       },
       entryConfig: {

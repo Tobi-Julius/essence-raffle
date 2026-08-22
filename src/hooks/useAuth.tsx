@@ -53,8 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     setProfileLoading(true);
     const unsub = onSnapshot(
-      doc(db, "users", user.uid),
+      doc(db, "users", user?.uid),
       (snap) => {
+        console.warn(snap, user);
         setProfile(
           snap.exists()
             ? ({
@@ -78,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
     return unsub;
   }, [user]);
-  
 
   const value = useMemo<AuthState>(
     () => ({

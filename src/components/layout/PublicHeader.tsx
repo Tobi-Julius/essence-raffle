@@ -52,7 +52,8 @@ export function PublicHeader() {
               )}
               <Link href="/dashboard">
                 <Button variant="outline" size="sm">
-                  <LayoutDashboard className="h-4 w-4" /> {profile?.fullName?.split(" ")[0] ?? "Dashboard"}
+                  <LayoutDashboard className="h-4 w-4" />{" "}
+                  {profile?.fullName?.split(" ")[0] ?? "Dashboard"}
                 </Button>
               </Link>
               <Button
@@ -85,14 +86,23 @@ export function PublicHeader() {
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((v) => !v)}
         >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {mobileOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
         </button>
       </div>
       {mobileOpen && (
         <div className="border-t border-neutral-100 px-4 py-4 md:hidden">
           <nav className="flex flex-col gap-3">
             {navLinks.map((link) => (
-              <Link key={link.href} href={link.href} className="text-sm font-medium text-neutral-700" onClick={() => setMobileOpen(false)}>
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm font-medium text-neutral-700"
+                onClick={() => setMobileOpen(false)}
+              >
                 {link.label}
               </Link>
             ))}
@@ -101,13 +111,21 @@ export function PublicHeader() {
                 <>
                   {isAdmin(role) && (
                     <Link href="/admin" onClick={() => setMobileOpen(false)}>
-                      <Button variant="ghost" size="sm" className="w-full justify-start">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start"
+                      >
                         Admin
                       </Button>
                     </Link>
                   )}
                   <Link href="/dashboard" onClick={() => setMobileOpen(false)}>
-                    <Button variant="outline" size="sm" className="w-full justify-start">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
                       Dashboard
                     </Button>
                   </Link>
@@ -127,7 +145,11 @@ export function PublicHeader() {
               ) : (
                 <>
                   <Link href="/login" onClick={() => setMobileOpen(false)}>
-                    <Button variant="ghost" size="sm" className="w-full justify-start">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
                       Log in
                     </Button>
                   </Link>

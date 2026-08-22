@@ -58,7 +58,7 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     "Refusing to run: GOOGLE_APPLICATION_CREDENTIALS is not set.\n" +
       "Download a service account key from Firebase Console -> Project settings\n" +
       "-> Service accounts, then:\n" +
-      "  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json",
+      "  export GOOGLE_APPLICATION_CREDENTIALS=./service-account.json",
   );
   process.exit(1);
 }
