@@ -55,7 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsub = onSnapshot(
       doc(db, "users", user?.uid),
       (snap) => {
-        console.warn(snap, user);
         setProfile(
           snap.exists()
             ? ({
