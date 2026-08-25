@@ -20,7 +20,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { converterFor } from "@/lib/firebase/converters";
-import type { Raffle, RaffleListSection } from "@/types/firestore";
+import { computeLifecycleStatus } from "@/lib/utils/raffleLifecycle";
+import { AppError } from "@/lib/errors";
+import type { Raffle, RaffleListSection, UserRole } from "@/types/firestore";
 import type { RaffleCreateInput } from "@/lib/validation/schemas";
 
 const raffleConverter = converterFor<Raffle>();
@@ -103,9 +105,7 @@ export async function createDraftRaffle(input: RaffleCreateInput, createdBy: str
     slug: slugify(input.basicInfo.name),
     shortDescription: input.basicInfo.shortDescription,
     fullDescription: input.basicInfo.fullDescription,
-    bannerPath: null,
     bannerUrl: null,
-    thumbnailPath: null,
     thumbnailUrl: null,
     status: "DRAFT",
     schedule: {
@@ -164,13 +164,57 @@ export async function updateDraftRaffle(
 
 export async function updateRaffleMedia(
   raffleId: string,
-  media: { bannerPath?: string; bannerUrl?: string; thumbnailPath?: string; thumbnailUrl?: string },
+  media: { bannerUrl?: string; thumbnailUrl?: string },
 ): Promise<void> {
   await updateDoc(doc(db, "raffles", raffleId), { ...media, updatedAt: serverTimestamp() });
 }
 
 export async function deleteDraftRaffle(raffleId: string): Promise<void> {
   await deleteDoc(doc(db, "raffles", raffleId));
+}
+
+/**
+ * DRAFT -> UPCOMING/OPEN/DRAWING, whichever the registration window is
+ * currently in (same computeLifecycleStatus used by the status sweep, so a
+ * raffle published after its window already started lands in the right
+ * place immediately instead of waiting for the next sweep). Replaces the
+ * removed publishRaffle Cloud Function. firestore.rules backstops the
+ * prize-exists check; the admin UI's checklist also requires active terms
+ * before this button is enabled.
+ */
+export async function publishRaffle(raffleId: string, actorId: string, actorRole: UserRole): Promise<void> {
+  const snap = await getDoc(raffleDocRef(raffleId));
+  if (!snap.exists()) throw new AppError("Raffle not found.");
+  const raffle = snap.data();
+  const lifecycle = computeLifecycleStatus(raffle.schedule);
+  const status = lifecycle === "READY_FOR_DRAW" ? "DRAWING" : lifecycle;
+
+  await updateDoc(doc(db, "raffles", raffleId), { status, updatedAt: serverTimestamp() });
+  await addDoc(collection(db, "auditLogs"), {
+    action: "RAFFLE_PUBLISHED",
+    actorId,
+    actorRole,
+    raffleId,
+    timestamp: serverTimestamp(),
+  });
+}
+
+/** Any non-terminal status -> CANCELLED. Replaces the removed cancelRaffle Cloud Function. */
+export async function cancelRaffle(
+  raffleId: string,
+  reason: string,
+  actorId: string,
+  actorRole: UserRole,
+): Promise<void> {
+  await updateDoc(doc(db, "raffles", raffleId), { status: "CANCELLED", updatedAt: serverTimestamp() });
+  await addDoc(collection(db, "auditLogs"), {
+    action: "RAFFLE_CANCELLED",
+    actorId,
+    actorRole,
+    raffleId,
+    timestamp: serverTimestamp(),
+    metadata: { reason },
+  });
 }
 
 function slugify(name: string): string {

@@ -84,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       profile,
-      // The Firestore-mirrored role is used for UI display; it is kept in
-      // sync with the auth custom claim by the Cloud Function that changes
-      // roles. All real enforcement happens server-side against the claim.
+      // This IS the role — there's no separate Auth custom claim anymore.
+      // firestore.rules reads this exact same users/{uid}.role field
+      // (see myRole() in firestore.rules), so this value is also what real
+      // enforcement checks, not just a UI-display mirror of something else.
       role: profile?.role ?? null,
       loading: authLoading || profileLoading,
       emailVerified: user?.emailVerified ?? false,

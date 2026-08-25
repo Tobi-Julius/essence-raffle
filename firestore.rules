@@ -1,14 +1,16 @@
 rules_version = '2';
 
 /**
- * Security model, in one sentence: participants may only ever create their
- * own profile and read their own money/eligibility-affecting documents —
- * every write that touches payment status, entry eligibility, winner
- * selection, prizes, terms publication, or roles happens exclusively inside
- * a Cloud Function (functions/src/**), which uses the Admin SDK and is
- * therefore NOT subject to these rules at all. These rules are the backstop
- * for direct client SDK access, not the primary authorization layer for
- * those operations — the Cloud Functions re-check everything themselves.
+ * Security model, in one sentence: every privileged write (payment status,
+ * entry eligibility, winner selection, prizes, terms publication, roles) is
+ * authorized ENTIRELY by the rules below — there is no Cloud Functions layer
+ * behind these rules on this project (Spark plan; Cloud Functions require
+ * Blaze and are intentionally not used). These rules ARE the primary
+ * authorization boundary, not a backstop.
+ *
+ * Role checks read `users/{uid}.role`/`isActive` directly (no Auth custom
+ * claims — nothing sets those without a Cloud Function). `myRole()` is the
+ * single source of truth every isAdmin()/isSuperAdmin() check depends on.
  *
  * Enable Firebase App Check enforcement for Cloud Firestore in the Firebase
  * Console for this project; it is a defense-in-depth layer against
@@ -21,8 +23,16 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function myProfile() {
+      return isSignedIn() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data : null;
+    }
+
+    function isActiveUser() {
+      return myProfile() != null && myProfile().isActive == true;
+    }
+
     function myRole() {
-      return isSignedIn() ? request.auth.token.role : null;
+      return isActiveUser() ? myProfile().role : null;
     }
 
     function isAdmin() {
@@ -55,10 +65,11 @@ service cloud.firestore {
         && request.resource.data.isActive == true
         && request.resource.data.keys().hasAll(['fullName', 'email', 'phoneNumber', 'role', 'isActive', 'createdAt', 'updatedAt']);
 
-      // Only the owner may update, and only non-sensitive contact fields.
-      // role/isActive can ONLY change via the setUserRole/setUserActive
-      // Cloud Functions (Admin SDK writes bypass these rules).
-      allow update: if isOwner(userId) && unchangedExcept(['fullName', 'phoneNumber', 'photoURL', 'updatedAt']);
+      // The owner may update their own non-sensitive contact fields. A
+      // super_admin (never themself) may change role/isActive — this is the
+      // entire role-management mechanism now; there is no Cloud Function.
+      allow update: if (isOwner(userId) && unchangedExcept(['fullName', 'phoneNumber', 'photoURL', 'updatedAt']))
+        || (isSuperAdmin() && request.auth.uid != userId && unchangedExcept(['role', 'isActive', 'updatedAt']));
 
       allow delete: if false;
     }
@@ -78,16 +89,70 @@ service cloud.firestore {
         && request.resource.data.hasWinner == false
         && request.resource.data.stats.totalRegistrations == 0;
 
-      // Content edits only, only while still draft/upcoming. Status,
-      // stats, hasWinner, currentWinnerEntryId, activeTermsId/Version are
-      // exclusively Cloud-Function-owned fields.
-      allow update: if isAdmin()
-        && resource.data.status in ['DRAFT', 'UPCOMING']
-        && unchangedExcept([
-          'name', 'nameLower', 'slug', 'shortDescription', 'fullDescription',
-          'bannerPath', 'bannerUrl', 'thumbnailPath', 'thumbnailUrl',
-          'schedule', 'payment', 'eligibility', 'entryConfig', 'updatedAt'
-        ]);
+      allow update: if
+        // A. Content edits — admin, only while DRAFT/UPCOMING, status itself
+        // unchanged in this branch.
+        (isAdmin()
+          && resource.data.status == request.resource.data.status
+          && resource.data.status in ['DRAFT', 'UPCOMING']
+          && unchangedExcept([
+            'name', 'nameLower', 'slug', 'shortDescription', 'fullDescription',
+            'bannerUrl', 'thumbnailUrl',
+            'schedule', 'payment', 'eligibility', 'entryConfig', 'updatedAt'
+          ]))
+        // B. Terms pointer — set by the publishTerms client flow, any status.
+        || (isAdmin()
+          && resource.data.status == request.resource.data.status
+          && unchangedExcept(['activeTermsId', 'activeTermsVersion', 'updatedAt']))
+        // C. Publish — DRAFT -> UPCOMING/OPEN/DRAWING (whichever the
+        // registration window is already in at publish time), requires a
+        // prize to exist. The admin-only UI checklist also requires active
+        // terms; this rule adds a server-side backstop for the prize half
+        // of that check.
+        || (isAdmin()
+          && resource.data.status == 'DRAFT'
+          && request.resource.data.status in ['UPCOMING', 'OPEN', 'DRAWING']
+          && exists(/databases/$(database)/documents/prizes/$(raffleId))
+          && unchangedExcept(['status', 'updatedAt']))
+        // D. Cancel — any non-terminal status -> CANCELLED.
+        || (isAdmin()
+          && resource.data.status in ['DRAFT', 'UPCOMING', 'OPEN', 'DRAWING']
+          && request.resource.data.status == 'CANCELLED'
+          && unchangedExcept(['status', 'updatedAt']))
+        // E/F. Lifecycle sweep — no Cloud Scheduler on Spark, so an admin's
+        // own browser (useRaffleStatusSweep) performs these once the
+        // relevant window has passed, per request.time (server-authoritative).
+        || (isAdmin()
+          && resource.data.status == 'UPCOMING'
+          && request.resource.data.status == 'OPEN'
+          && request.time >= resource.data.schedule.registrationStart
+          && unchangedExcept(['status', 'updatedAt']))
+        || (isAdmin()
+          && resource.data.status == 'OPEN'
+          && request.resource.data.status == 'DRAWING'
+          && request.time >= resource.data.schedule.registrationEnd
+          && unchangedExcept(['status', 'updatedAt']))
+        // G. Draw completion — DRAWING -> COMPLETED, winner fields + stats.
+        || (isAdmin()
+          && resource.data.status == 'DRAWING'
+          && request.resource.data.status == 'COMPLETED'
+          && unchangedExcept(['status', 'hasWinner', 'currentWinnerEntryId', 'stats', 'updatedAt']))
+        // H. Admin-triggered stat/winner adjustments with status unchanged —
+        // payment review, disqualify, redraw.
+        || (isAdmin()
+          && resource.data.status == request.resource.data.status
+          && unchangedExcept(['stats', 'hasWinner', 'currentWinnerEntryId', 'updatedAt']))
+        // I. Registration stats bump — participant-triggered, exactly +1 on
+        // exactly these two counters, nothing else in stats moves.
+        || (isSignedIn()
+          && resource.data.status == request.resource.data.status
+          && request.resource.data.stats.totalRegistrations == resource.data.stats.totalRegistrations + 1
+          && request.resource.data.stats.paymentsPending == resource.data.stats.paymentsPending + 1
+          && request.resource.data.stats.paymentsApproved == resource.data.stats.paymentsApproved
+          && request.resource.data.stats.paymentsRejected == resource.data.stats.paymentsRejected
+          && request.resource.data.stats.eligibleEntries == resource.data.stats.eligibleEntries
+          && request.resource.data.stats.disqualifiedEntries == resource.data.stats.disqualifiedEntries
+          && unchangedExcept(['stats', 'updatedAt']));
 
       allow delete: if isAdmin() && resource.data.status == 'DRAFT';
 
@@ -97,10 +162,13 @@ service cloud.firestore {
           && request.resource.data.status == 'draft'
           && request.resource.data.createdBy == request.auth.uid
           && request.resource.data.raffleId == raffleId;
-        // Publishing/archiving only via the publishTerms Cloud Function.
         allow update: if isAdmin()
-          && resource.data.status == 'draft'
-          && unchangedExcept(['contentJson', 'contentHtml', 'updatedAt']);
+          && ((resource.data.status == 'draft' && request.resource.data.status == 'draft'
+              && unchangedExcept(['contentJson', 'contentHtml', 'updatedAt']))
+            || (resource.data.status == 'draft' && request.resource.data.status == 'active'
+              && unchangedExcept(['status', 'updatedAt']))
+            || (resource.data.status == 'active' && request.resource.data.status == 'archived'
+              && unchangedExcept(['status', 'updatedAt'])));
         allow delete: if false;
       }
     }
@@ -113,15 +181,17 @@ service cloud.firestore {
       allow create: if isAdmin()
         && request.resource.data.raffleId == raffleId
         && request.resource.data.status == 'available';
-      // Claim status/claimedBy/verifiedBy are exclusively set by the
-      // claimPrize Cloud Function.
       allow update: if isAdmin()
-        && unchangedExcept(['name', 'description', 'imagePath', 'imageUrl', 'videoPath', 'videoUrl', 'value', 'currency', 'updatedAt']);
+        && unchangedExcept([
+          'name', 'description', 'imageUrl', 'videoUrl', 'value', 'currency',
+          'status', 'claimedAt', 'claimedBy', 'verifiedBy', 'claimNotes',
+          'deliveryDate', 'deliveryMethod', 'updatedAt'
+        ]);
       allow delete: if false;
     }
 
     // ---------------------------------------------------------------------
-    // entries — created/mutated exclusively by Cloud Functions
+    // entries
     // ---------------------------------------------------------------------
     match /entries/{entryId} {
       // For `list`, Firestore evaluates this rule against every document
@@ -131,48 +201,93 @@ service cloud.firestore {
       // ownership check below. Admin queries (no userId filter) instead
       // satisfy the isAdmin() branch, which holds for every candidate.
       allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if false;
+
+      // Created by the registering participant, for themself, always in the
+      // same starting state — the registration transaction (raffles rule
+      // branch I) enforces the rest of the invariants alongside this.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'payment_pending'
+        && request.resource.data.isEligible == false;
+
+      allow update: if isAdmin()
+        && ((resource.data.status == 'payment_pending' && request.resource.data.status in ['eligible', 'rejected']
+            && unchangedExcept(['status', 'isEligible', 'updatedAt']))
+          || (resource.data.status == 'eligible' && request.resource.data.status == 'disqualified'
+            && unchangedExcept(['status', 'isEligible', 'updatedAt']))
+          || (resource.data.status == 'eligible' && request.resource.data.status == 'winner'
+            && unchangedExcept(['status', 'updatedAt'])));
+
+      allow delete: if false;
     }
 
     // ---------------------------------------------------------------------
-    // payments — created/mutated exclusively by Cloud Functions
+    // payments
     // ---------------------------------------------------------------------
     match /payments/{paymentId} {
       allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow write: if false;
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow update: if isAdmin()
+        && resource.data.status == 'pending'
+        && request.resource.data.status in ['approved', 'rejected']
+        && unchangedExcept(['status', 'reviewedAt', 'reviewedBy', 'rejectionReason', 'updatedAt']);
+
+      allow delete: if false;
     }
 
-    // Internal uniqueness registries — never read or written by clients.
+    // Payment-reference uniqueness registry: create-only (fails atomically
+    // if the reference is already taken), never read back or mutated.
     match /paymentReferences/{reference} {
-      allow read, write: if false;
+      allow get: if isSignedIn();
+      allow create: if isSignedIn();
+      allow list, update, delete: if false;
     }
+
+    // Per-raffle atomic entry-number sequence.
     match /counters/{raffleId} {
-      allow read, write: if false;
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.lastEntrySequence == 1;
+      allow update: if isSignedIn()
+        && request.resource.data.lastEntrySequence == resource.data.lastEntrySequence + 1;
+      allow list, delete: if false;
     }
 
     // ---------------------------------------------------------------------
-    // draws — public read for the live draw screen; Cloud Functions only write
+    // draws — public read for the live draw screen; admin-only write
     // ---------------------------------------------------------------------
     match /draws/{drawId} {
       allow get, list: if true;
-      allow write: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        && unchangedExcept(['presentationState', 'status', 'completedAt', 'failureReason', 'updatedAt']);
+      allow delete: if false;
     }
 
     // ---------------------------------------------------------------------
-    // winners — public read (masked display name only, by design); Cloud
-    // Functions only write. Disqualification/redraw never delete a record.
+    // winners — public read (masked display name only, by design);
+    // admin-only write. Disqualification/redraw never delete a record.
     // ---------------------------------------------------------------------
     match /winners/{winnerId} {
       allow get, list: if true;
-      allow write: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        && unchangedExcept(['status', 'isActive', 'disqualifiedBy', 'disqualifiedAt', 'disqualificationReason', 'updatedAt']);
+      allow delete: if false;
     }
 
     // ---------------------------------------------------------------------
-    // auditLogs — append-only, admin-readable, never client-writable
+    // auditLogs — append-only, admin-readable, written by whoever performs
+    // the action they're logging (self-attested — see AGENTS/plan notes on
+    // the trust tradeoff this implies without a Cloud Function backing it).
     // ---------------------------------------------------------------------
     match /auditLogs/{logId} {
       allow get, list: if isAdmin();
-      allow write: if false;
+      allow create: if isSignedIn() && request.resource.data.actorId == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }

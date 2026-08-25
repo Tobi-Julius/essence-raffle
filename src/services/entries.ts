@@ -61,3 +61,10 @@ export async function countEligibleEntries(raffleId: string): Promise<number> {
   const snap = await getCountFromServer(q);
   return snap.data().count;
 }
+
+/** Full eligible-entries pool for a raffle, used to draw a winner from — see src/services/draws.ts. */
+export async function listEligibleEntries(raffleId: string): Promise<RaffleEntry[]> {
+  const q = query(entriesCol(), where("raffleId", "==", raffleId), where("status", "==", "eligible"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data());
+}

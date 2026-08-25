@@ -13,9 +13,9 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAdminRaffle } from "@/hooks/useAdminRaffle";
 import { countEligibleEntries } from "@/services/entries";
-import { watchLatestDraw } from "@/services/draws";
+import { advanceDrawPresentation, runDraw, watchLatestDraw } from "@/services/draws";
 import { watchActiveWinner } from "@/services/winners";
-import { startDraw, updateDrawPresentation } from "@/services/callables";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
 import { formatDateTime } from "@/lib/utils/dates";
@@ -26,6 +26,7 @@ const presentationFlow: DrawPresentationState[] = ["READY", "DRAWING", "REVEALIN
 export default function AdminDrawPage() {
   const params = useParams<{ raffleId: string }>();
   const { raffle, loading } = useAdminRaffle(params.raffleId);
+  const { user, role } = useAuth();
   const [eligibleCount, setEligibleCount] = useState<number | null>(null);
   const [draw, setDraw] = useState<Draw | null>(null);
   const [winner, setWinner] = useState<Winner | null>(null);
@@ -49,19 +50,20 @@ export default function AdminDrawPage() {
   const nextState = draw ? presentationFlow[presentationFlow.indexOf(draw.presentationState) + 1] : null;
 
   async function handleStart() {
+    if (!user || !role) return;
     try {
-      await startDraw({ raffleId: raffle!.id, forceEarly: false });
-      show("success", "Draw started.");
+      await runDraw(raffle!.id, user.uid, role);
+      show("success", "Draw complete — a winner was selected.");
     } catch (e) {
       show("error", toFriendlyError(e));
     }
   }
 
   async function handleAdvance() {
-    if (!nextState) return;
+    if (!nextState || !draw) return;
     setAdvancing(true);
     try {
-      await updateDrawPresentation({ raffleId: raffle!.id, presentationState: nextState });
+      await advanceDrawPresentation(draw.id, nextState);
     } catch (e) {
       show("error", toFriendlyError(e));
     } finally {
@@ -150,7 +152,7 @@ export default function AdminDrawPage() {
         open={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         title="Start the draw?"
-        description="Winner selection happens securely on the server using the current eligible entry pool. This cannot be undone once started."
+        description="A winner is selected at random from the current eligible entry pool. This cannot be undone once started."
         confirmLabel="Start draw"
         onConfirm={handleStart}
       />

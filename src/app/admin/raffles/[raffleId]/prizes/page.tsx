@@ -7,13 +7,11 @@ import { RaffleSubNav } from "@/components/admin/RaffleSubNav";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Input, Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { FileUpload } from "@/components/ui/FileUpload";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { Alert } from "@/components/ui/Alert";
 import { useAdminRaffle } from "@/hooks/useAdminRaffle";
 import { prizeSchema } from "@/lib/validation/schemas";
 import { upsertPrize, updatePrizeMedia } from "@/services/prizes";
-import { uploadPrizeImage, uploadPrizeVideo } from "@/services/storage";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
 
@@ -24,8 +22,10 @@ export default function AdminPrizePage() {
   const [form, setForm] = useState({ name: "", description: "", value: "", currency: "NGN" });
   const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [imageProgress, setImageProgress] = useState<number | null>(null);
-  const [videoProgress, setVideoProgress] = useState<number | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [savingImage, setSavingImage] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [savingVideo, setSavingVideo] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!initialized && prize) {
@@ -72,33 +72,35 @@ export default function AdminPrizePage() {
     refresh();
   }
 
-  async function handleImage(file: File) {
+  async function handleImage() {
+    if (!imageUrl.trim()) return;
+    setSavingImage(true);
     try {
       await ensurePrizeExists();
-      const { done } = uploadPrizeImage(raffle!.id, file, setImageProgress);
-      const { path, url } = await done;
-      await updatePrizeMedia(raffle!.id, { imagePath: path, imageUrl: url });
+      await updatePrizeMedia(raffle!.id, { imageUrl: imageUrl.trim() });
       show("success", "Prize image updated.");
+      setImageUrl("");
       refresh();
     } catch (err) {
       show("error", toFriendlyError(err));
     } finally {
-      setImageProgress(null);
+      setSavingImage(false);
     }
   }
 
-  async function handleVideo(file: File) {
+  async function handleVideo() {
+    if (!videoUrl.trim()) return;
+    setSavingVideo(true);
     try {
       await ensurePrizeExists();
-      const { done } = uploadPrizeVideo(raffle!.id, file, setVideoProgress);
-      const { path, url } = await done;
-      await updatePrizeMedia(raffle!.id, { videoPath: path, videoUrl: url });
+      await updatePrizeMedia(raffle!.id, { videoUrl: videoUrl.trim() });
       show("success", "Prize video updated.");
+      setVideoUrl("");
       refresh();
     } catch (err) {
       show("error", toFriendlyError(err));
     } finally {
-      setVideoProgress(null);
+      setSavingVideo(false);
     }
   }
 
@@ -138,26 +140,38 @@ export default function AdminPrizePage() {
                   <Image src={prize.imageUrl} alt="" fill className="object-cover" />
                 </div>
               )}
-              <FileUpload
-                label={prize?.imageUrl ? "Replace image" : "Upload image"}
-                hint="JPG, PNG, or WEBP — up to 5MB"
-                accept="image/jpeg,image/png,image/webp"
-                onSelect={handleImage}
-                progress={imageProgress}
-              />
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Input
+                    label="Image URL"
+                    placeholder="https://…"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleImage} loading={savingImage} disabled={!imageUrl.trim()}>
+                  Save
+                </Button>
+              </div>
             </div>
             <div>
               <h2 className="font-semibold text-neutral-900">Prize video</h2>
               {prize?.videoUrl && (
                 <video src={prize.videoUrl} controls className="mb-3 mt-2 w-full rounded-xl" />
               )}
-              <FileUpload
-                label={prize?.videoUrl ? "Replace video" : "Upload video"}
-                hint="MP4, WEBM, or MOV — up to 50MB"
-                accept="video/mp4,video/webm,video/quicktime"
-                onSelect={handleVideo}
-                progress={videoProgress}
-              />
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Input
+                    label="Video URL"
+                    placeholder="https://…"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                  />
+                </div>
+                <Button onClick={handleVideo} loading={savingVideo} disabled={!videoUrl.trim()}>
+                  Save
+                </Button>
+              </div>
             </div>
           </CardBody>
         </Card>

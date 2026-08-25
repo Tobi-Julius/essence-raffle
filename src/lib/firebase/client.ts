@@ -12,16 +12,6 @@ import {
   getFirestore,
   type Firestore,
 } from "firebase/firestore";
-import {
-  connectFunctionsEmulator,
-  getFunctions,
-  type Functions,
-} from "firebase/functions";
-import {
-  connectStorageEmulator,
-  getStorage,
-  type FirebaseStorage,
-} from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -41,8 +31,6 @@ function createApp(): FirebaseApp {
 export const app = createApp();
 export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
-export const storage: FirebaseStorage = getStorage(app);
-export const functions: Functions = getFunctions(app);
 
 let appCheckInstance: AppCheck | null = null;
 
@@ -70,8 +58,6 @@ export function ensureEmulators(): void {
   emulatorsConnected = true;
   connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
   connectFirestoreEmulator(db, "127.0.0.1", 8080);
-  connectStorageEmulator(storage, "127.0.0.1", 9199);
-  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
 }
 
 if (typeof window !== "undefined") {

@@ -151,7 +151,7 @@ export default function ParticipantRafflePage() {
                   <p className="font-mono text-sm font-medium text-neutral-700">Entry {entry.entryNumber}</p>
                   <EntryStatusBadge status={entry.status} />
                 </div>
-                {payment && <LivePaymentCard paymentId={payment.id} raffle={raffle} userId={user!.uid} />}
+                {payment && <LivePaymentCard paymentId={payment.id} raffle={raffle} />}
               </div>
             ))}
         </div>

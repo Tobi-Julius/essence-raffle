@@ -8,8 +8,8 @@ import { RaffleStatusBadge } from "@/components/ui/Badge";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { listAllRafflesForAdmin } from "@/services/raffles";
-import { publishRaffle, cancelRaffle } from "@/services/callables";
+import { listAllRafflesForAdmin, publishRaffle, cancelRaffle } from "@/services/raffles";
+import { useAuth } from "@/hooks/useAuth";
 import { formatDateTime } from "@/lib/utils/dates";
 import { formatMoney } from "@/lib/utils/money";
 import { useToast } from "@/components/ui/Toast";
@@ -18,6 +18,7 @@ import type { Raffle } from "@/types/firestore";
 
 export default function AdminRafflesPage() {
   const router = useRouter();
+  const { user, role } = useAuth();
   const [raffles, setRaffles] = useState<Raffle[] | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Raffle | null>(null);
   const { show } = useToast();
@@ -57,8 +58,9 @@ export default function AdminRafflesPage() {
             {
               label: "Publish",
               onClick: async () => {
+                if (!user || !role) return;
                 try {
-                  await publishRaffle(r.id);
+                  await publishRaffle(r.id, user.uid, role);
                   show("success", "Raffle published.");
                   refresh();
                 } catch (e) {
@@ -112,8 +114,8 @@ export default function AdminRafflesPage() {
         requireReason
         reasonLabel="Reason for cancellation"
         onConfirm={async (reason) => {
-          if (!cancelTarget) return;
-          await cancelRaffle(cancelTarget.id, reason ?? "");
+          if (!cancelTarget || !user || !role) return;
+          await cancelRaffle(cancelTarget.id, reason ?? "", user.uid, role);
           show("success", "Raffle cancelled.");
           refresh();
         }}

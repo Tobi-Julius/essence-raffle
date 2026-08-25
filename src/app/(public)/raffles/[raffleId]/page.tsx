@@ -262,19 +262,9 @@ function CtaPanel({
         </>
       );
     }
-    if (activeEntry.status === "verification_pending") {
-      return (
-        <>
-          <Alert tone="warning" title="Payment verification pending">We&apos;re reviewing your receipt.</Alert>
-          <Button className="w-full" variant="outline" onClick={onManage}>
-            View status
-          </Button>
-        </>
-      );
-    }
     return (
       <>
-        <Alert tone="info" title="Payment pending">Complete your bank transfer and upload your receipt.</Alert>
+        <Alert tone="info" title="Payment pending">Complete your bank transfer and send proof via WhatsApp.</Alert>
         <Button className="w-full" onClick={onManage}>
           Continue to payment
         </Button>

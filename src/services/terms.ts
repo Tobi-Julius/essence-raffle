@@ -12,11 +12,13 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { converterFor } from "@/lib/firebase/converters";
 import { logSnapshotError } from "@/lib/firebase/snapshot";
-import type { RaffleTerms } from "@/types/firestore";
+import { AppError } from "@/lib/errors";
+import type { RaffleTerms, UserRole } from "@/types/firestore";
 import type { TermsContentInput } from "@/lib/validation/schemas";
 
 const termsConverter = converterFor<RaffleTerms>();
@@ -92,4 +94,53 @@ export async function updateDraftTerms(
     contentHtml: content.contentHtml,
     updatedAt: serverTimestamp(),
   });
+}
+
+export interface PublishTermsResult {
+  termsId: string;
+  version: number;
+}
+
+/**
+ * Promotes a draft terms version to active, archiving whatever was
+ * previously active, and updates the raffle's activeTermsId/Version
+ * pointer — all in one batch. Replaces the removed publishTerms Cloud
+ * Function; firestore.rules enforces the draft->active and active->archived
+ * transitions independently on each doc (see the /terms rule).
+ */
+export async function publishTerms(
+  raffleId: string,
+  termsId: string,
+  actorId: string,
+  actorRole: UserRole,
+): Promise<PublishTermsResult> {
+  const draftSnap = await getDoc(termsDoc(raffleId, termsId));
+  if (!draftSnap.exists()) throw new AppError("Draft terms not found.");
+  const draft = draftSnap.data();
+  if (draft.status !== "draft") throw new AppError("Only a draft version can be published.");
+
+  const activeSnap = await getDocs(query(termsCol(raffleId), where("status", "==", "active")));
+
+  const batch = writeBatch(db);
+  for (const activeDoc of activeSnap.docs) {
+    batch.update(activeDoc.ref, { status: "archived", updatedAt: serverTimestamp() });
+  }
+  batch.update(termsDoc(raffleId, termsId), { status: "active", updatedAt: serverTimestamp() });
+  batch.update(doc(db, "raffles", raffleId), {
+    activeTermsId: termsId,
+    activeTermsVersion: draft.version,
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(collection(db, "auditLogs")), {
+    action: "TERMS_PUBLISHED",
+    actorId,
+    actorRole,
+    raffleId,
+    targetId: termsId,
+    timestamp: serverTimestamp(),
+    metadata: { version: draft.version },
+  });
+  await batch.commit();
+
+  return { termsId, version: draft.version };
 }

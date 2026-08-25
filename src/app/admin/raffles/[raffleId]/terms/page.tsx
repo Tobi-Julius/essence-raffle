@@ -15,8 +15,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { useAdminRaffle } from "@/hooks/useAdminRaffle";
-import { createDraftTerms, listTermsVersions, updateDraftTerms } from "@/services/terms";
-import { publishTerms as publishTermsCallable } from "@/services/callables";
+import { createDraftTerms, listTermsVersions, publishTerms, updateDraftTerms } from "@/services/terms";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
@@ -28,7 +27,7 @@ const DEFAULT_DOC: JSONContent = { type: "doc", content: [{ type: "paragraph" }]
 export default function AdminTermsPage() {
   const params = useParams<{ raffleId: string }>();
   const { raffle, loading } = useAdminRaffle(params.raffleId);
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { show } = useToast();
   const [versions, setVersions] = useState<RaffleTerms[] | null>(null);
   const [draft, setDraft] = useState<JSONContent>(DEFAULT_DOC);
@@ -77,10 +76,10 @@ export default function AdminTermsPage() {
   }
 
   async function handlePublish() {
-    if (!draftId) return;
+    if (!draftId || !user || !role) return;
     setPublishing(true);
     try {
-      await publishTermsCallable(raffle!.id, draftId);
+      await publishTerms(raffle!.id, draftId, user.uid, role);
       show("success", "Terms published as the active version.");
       setDraftId(null);
       setDraft(DEFAULT_DOC);

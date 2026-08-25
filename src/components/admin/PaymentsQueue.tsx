@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/Button";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { listPaymentsForQueue } from "@/services/payments";
+import { listPaymentsForQueue, reviewPayment } from "@/services/payments";
 import { getUserProfile } from "@/services/users";
-import { getReceiptUrl } from "@/services/storage";
-import { reviewPayment } from "@/services/callables";
+import { useAuth } from "@/hooks/useAuth";
 import { formatDateTime } from "@/lib/utils/dates";
 import { formatMoney } from "@/lib/utils/money";
+import { whatsappLink } from "@/lib/utils/whatsapp";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
 import type { Payment, PaymentStatus } from "@/types/firestore";
@@ -25,17 +25,17 @@ interface Row {
   email: string;
 }
 
-const statusOptions: (PaymentStatus | "all")[] = ["all", "verification_pending", "approved", "rejected", "pending"];
+const statusOptions: (PaymentStatus | "all")[] = ["all", "pending", "approved", "rejected"];
 
 export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
-  const [status, setStatus] = useState<PaymentStatus | "all">("verification_pending");
+  const { user, role } = useAuth();
+  const [status, setStatus] = useState<PaymentStatus | "all">("pending");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [cursor, setCursor] = useState<QueryDocumentSnapshot<Payment> | null>(null);
   const [history, setHistory] = useState<(QueryDocumentSnapshot<Payment> | null)[]>([null]);
   const [pageIndex, setPageIndex] = useState(0);
   const [viewing, setViewing] = useState<Row | null>(null);
-  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<Row | null>(null);
   const { show } = useToast();
 
@@ -57,18 +57,14 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raffleId, status, pageIndex, history]);
 
-  async function handleView(row: Row) {
+  function handleView(row: Row) {
     setViewing(row);
-    setReceiptUrl(null);
-    if (row.payment.receiptPath) {
-      const url = await getReceiptUrl(row.payment.receiptPath);
-      setReceiptUrl(url);
-    }
   }
 
   async function handleApprove(row: Row) {
+    if (!user || !role) return;
     try {
-      await reviewPayment({ paymentId: row.payment.id, decision: "approve" });
+      await reviewPayment({ paymentId: row.payment.id, decision: "approve" }, user.uid, role);
       show("success", `Payment approved — entry ${row.name} is now confirmed.`);
       load();
       setViewing(null);
@@ -91,7 +87,7 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
     { header: "Reference", key: "ref", render: (r) => <span className="font-mono text-xs">{r.payment.reference}</span> },
     { header: "Amount", key: "amount", render: (r) => formatMoney(r.payment.amount, r.payment.currency) },
     { header: "Status", key: "status", render: (r) => <PaymentStatusBadge status={r.payment.status} /> },
-    { header: "Submitted", key: "submitted", render: (r) => formatDateTime(r.payment.submittedAt) },
+    { header: "Submitted", key: "submitted", render: (r) => formatDateTime(r.payment.createdAt) },
     {
       header: "",
       key: "actions",
@@ -145,7 +141,7 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
         description={viewing ? `${viewing.name} · ${formatMoney(viewing.payment.amount, viewing.payment.currency)}` : undefined}
         size="lg"
         footer={
-          viewing?.payment.status === "verification_pending" ? (
+          viewing?.payment.status === "pending" ? (
             <>
               <Button variant="danger" onClick={() => setRejecting(viewing)}>
                 Reject
@@ -161,27 +157,27 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
               <Field label="Reference" value={viewing.payment.reference} />
               <Field label="Email" value={viewing.email} />
               <Field label="Amount" value={formatMoney(viewing.payment.amount, viewing.payment.currency)} />
-              <Field label="Submitted" value={formatDateTime(viewing.payment.submittedAt)} />
+              <Field label="Submitted" value={formatDateTime(viewing.payment.createdAt)} />
             </dl>
             {viewing.payment.rejectionReason && (
               <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Rejected: {viewing.payment.rejectionReason}</p>
             )}
-            {viewing.payment.receiptPath ? (
-              receiptUrl ? (
-                receiptUrl.includes(".pdf") ? (
-                  <a href={receiptUrl} target="_blank" rel="noreferrer" className="text-sm font-medium text-brand-700 hover:underline">
-                    Open PDF receipt
+            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+              Verify this payment&apos;s proof on WhatsApp before approving.
+              {whatsappLink(`Payment proof for reference ${viewing.payment.reference}`) && (
+                <>
+                  {" "}
+                  <a
+                    href={whatsappLink(`Payment proof for reference ${viewing.payment.reference}`)!}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium underline"
+                  >
+                    Open WhatsApp
                   </a>
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element -- external Firebase Storage URL, next/image domain config not needed for admin preview
-                  <img src={receiptUrl} alt="Payment receipt" className="max-h-[50vh] w-full rounded-xl border border-neutral-200 object-contain" />
-                )
-              ) : (
-                <p className="text-sm text-neutral-400">Loading receipt…</p>
-              )
-            ) : (
-              <p className="text-sm text-neutral-400">No receipt uploaded yet.</p>
-            )}
+                </>
+              )}
+            </p>
           </div>
         )}
       </Modal>
@@ -190,14 +186,18 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
         open={!!rejecting}
         onClose={() => setRejecting(null)}
         title="Reject this payment?"
-        description="The participant will see this reason and can upload a new receipt."
+        description="The participant will see this reason and can resend proof via WhatsApp."
         confirmLabel="Reject payment"
         danger
         requireReason
         reasonLabel="Rejection reason"
         onConfirm={async (reason) => {
-          if (!rejecting) return;
-          await reviewPayment({ paymentId: rejecting.payment.id, decision: "reject", rejectionReason: reason });
+          if (!rejecting || !user || !role) return;
+          await reviewPayment(
+            { paymentId: rejecting.payment.id, decision: "reject", rejectionReason: reason },
+            user.uid,
+            role,
+          );
           show("success", "Payment rejected.");
           setViewing(null);
           load();

@@ -47,17 +47,11 @@ export const ELIGIBILITY_TYPES = [
 ] as const;
 export type EligibilityType = (typeof ELIGIBILITY_TYPES)[number];
 
-export const PAYMENT_STATUSES = [
-  "pending",
-  "verification_pending",
-  "approved",
-  "rejected",
-] as const;
+export const PAYMENT_STATUSES = ["pending", "approved", "rejected"] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   pending: "Awaiting your bank transfer",
-  verification_pending: "Payment verification pending",
   approved: "Payment approved",
   rejected: "Payment could not be verified",
 };
@@ -67,7 +61,6 @@ export type RefundStatus = (typeof REFUND_STATUSES)[number];
 
 export const ENTRY_STATUSES = [
   "payment_pending",
-  "verification_pending",
   "eligible",
   "rejected",
   "cancelled",
@@ -78,7 +71,6 @@ export type EntryStatus = (typeof ENTRY_STATUSES)[number];
 
 export const ENTRY_STATUS_LABELS: Record<EntryStatus, string> = {
   payment_pending: "Payment pending",
-  verification_pending: "Payment verification pending",
   eligible: "You're officially entered",
   rejected: "Payment could not be verified",
   cancelled: "Cancelled",
@@ -197,8 +189,9 @@ export interface RaffleEntryConfig {
 }
 
 export interface RaffleStats {
-  // Denormalized counters maintained server-side (Cloud Functions) to avoid
-  // expensive aggregation reads on every dashboard load.
+  // Denormalized counters, incremented atomically alongside the writes that
+  // change them (see src/services/*.ts), to avoid expensive aggregation
+  // reads on every dashboard load.
   totalRegistrations: number;
   paymentsPending: number;
   paymentsApproved: number;
@@ -214,9 +207,7 @@ export interface Raffle {
   slug: string;
   shortDescription: string;
   fullDescription: string;
-  bannerPath?: string | null;
   bannerUrl?: string | null;
-  thumbnailPath?: string | null;
   thumbnailUrl?: string | null;
   status: RaffleStatus;
   schedule: RaffleSchedule;
@@ -239,9 +230,7 @@ export interface Prize {
   raffleId: string;
   name: string;
   description: string;
-  imagePath?: string | null;
   imageUrl?: string | null;
-  videoPath?: string | null;
   videoUrl?: string | null;
   value?: number | null;
   currency?: string | null;
@@ -279,10 +268,8 @@ export interface Payment {
   currency: string;
   paymentMethod: "bank_transfer";
   reference: string;
-  receiptPath?: string | null;
   status: PaymentStatus;
   refundStatus: RefundStatus;
-  submittedAt?: Timestamp | null;
   reviewedAt?: Timestamp | null;
   reviewedBy?: string | null;
   rejectionReason?: string | null;

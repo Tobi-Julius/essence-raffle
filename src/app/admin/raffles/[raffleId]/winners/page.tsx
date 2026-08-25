@@ -12,9 +12,10 @@ import { Input, Textarea } from "@/components/ui/Input";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { useAdminRaffle } from "@/hooks/useAdminRaffle";
-import { listWinnerHistory } from "@/services/winners";
+import { listWinnerHistory, disqualifyWinner, redraw } from "@/services/winners";
 import { getUserProfile } from "@/services/users";
-import { disqualifyWinner, redraw, claimPrize } from "@/services/callables";
+import { claimPrize } from "@/services/prizes";
+import { useAuth } from "@/hooks/useAuth";
 import { formatDateTime } from "@/lib/utils/dates";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
@@ -29,6 +30,7 @@ interface WinnerRow {
 export default function AdminWinnersPage() {
   const params = useParams<{ raffleId: string }>();
   const { raffle, prize, loading, refresh } = useAdminRaffle(params.raffleId);
+  const { user, role } = useAuth();
   const [rows, setRows] = useState<WinnerRow[] | null>(null);
   const [disqualifyTarget, setDisqualifyTarget] = useState<Winner | null>(null);
   const [redrawing, setRedrawing] = useState(false);
@@ -52,9 +54,10 @@ export default function AdminWinnersPage() {
   const activeWinner = rows?.find((r) => r.winner.isActive);
 
   async function handleRedraw() {
+    if (!user || !role) return;
     setRedrawing(true);
     try {
-      const result = await redraw({ raffleId: raffle!.id });
+      const result = await redraw(raffle!.id, user.uid, role);
       if (result.winnerId) {
         show("success", "Redraw complete — a new winner was selected.");
       } else {
@@ -70,9 +73,15 @@ export default function AdminWinnersPage() {
   }
 
   async function handleClaim() {
+    if (!user || !role) return;
     setClaiming(true);
     try {
-      await claimPrize({ raffleId: raffle!.id, deliveryMethod: claimForm.deliveryMethod || undefined, claimNotes: claimForm.claimNotes || undefined });
+      await claimPrize(
+        raffle!.id,
+        { deliveryMethod: claimForm.deliveryMethod || undefined, claimNotes: claimForm.claimNotes || undefined },
+        user.uid,
+        role,
+      );
       show("success", "Prize marked as claimed.");
       refresh();
     } catch (e) {
@@ -177,8 +186,8 @@ export default function AdminWinnersPage() {
         danger
         requireReason
         onConfirm={async (reason) => {
-          if (!disqualifyTarget) return;
-          await disqualifyWinner({ winnerId: disqualifyTarget.id, reason: reason ?? "" });
+          if (!disqualifyTarget || !user || !role) return;
+          await disqualifyWinner(disqualifyTarget.id, reason ?? "", user.uid, role);
           show("success", "Winner disqualified.");
           load();
           refresh();

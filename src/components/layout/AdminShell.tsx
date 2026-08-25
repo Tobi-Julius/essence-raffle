@@ -17,7 +17,8 @@ import { Logo } from "@/components/layout/Logo";
 import { logoutUser } from "@/lib/firebase/auth";
 import { cn } from "@/lib/utils/cn";
 import { useAuth } from "@/hooks/useAuth";
-import { canManageAdmins } from "@/lib/permissions";
+import { canManageAdmins, isAdmin } from "@/lib/permissions";
+import { useRaffleStatusSweep } from "@/hooks/useRaffleStatusSweep";
 
 const links = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
@@ -31,6 +32,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { role, profile } = useAuth();
+  useRaffleStatusSweep(isAdmin(role));
 
   return (
     <div className="flex min-h-screen bg-neutral-50">
