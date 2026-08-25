@@ -7,7 +7,7 @@ interface Step {
   state: "done" | "current" | "pending" | "failed";
 }
 
-function stepsFor(paymentStatus: PaymentStatus, hasReceipt: boolean): Step[] {
+function stepsFor(paymentStatus: PaymentStatus): Step[] {
   const registrationDone: Step = { label: "Registration", state: "done" };
   const termsDone: Step = { label: "Terms accepted", state: "done" };
 
@@ -15,7 +15,7 @@ function stepsFor(paymentStatus: PaymentStatus, hasReceipt: boolean): Step[] {
     return [
       registrationDone,
       termsDone,
-      { label: "Payment submitted", state: "failed" },
+      { label: "Payment verification", state: "failed" },
       { label: "Official entry", state: "pending" },
     ];
   }
@@ -27,25 +27,16 @@ function stepsFor(paymentStatus: PaymentStatus, hasReceipt: boolean): Step[] {
       { label: "Official entry", state: "done" },
     ];
   }
-  if (paymentStatus === "verification_pending") {
-    return [
-      registrationDone,
-      termsDone,
-      { label: "Payment submitted", state: "done" },
-      { label: "Verification", state: "current" },
-      { label: "Official entry", state: "pending" },
-    ];
-  }
   return [
     registrationDone,
     termsDone,
-    { label: hasReceipt ? "Payment submitted" : "Payment submitted", state: hasReceipt ? "current" : "current" },
+    { label: "Awaiting verification", state: "current" },
     { label: "Official entry", state: "pending" },
   ];
 }
 
-export function PaymentTimeline({ paymentStatus, hasReceipt }: { paymentStatus: PaymentStatus; hasReceipt: boolean }) {
-  const steps = stepsFor(paymentStatus, hasReceipt);
+export function PaymentTimeline({ paymentStatus }: { paymentStatus: PaymentStatus }) {
+  const steps = stepsFor(paymentStatus);
   return (
     <ol className="space-y-3">
       {steps.map((step) => (

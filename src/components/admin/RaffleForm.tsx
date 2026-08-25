@@ -4,7 +4,10 @@ import { useState } from "react";
 import { Input, Select, Textarea, Checkbox } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
-import { raffleCreateSchema, type RaffleCreateInput } from "@/lib/validation/schemas";
+import {
+  raffleCreateSchema,
+  type RaffleCreateInput,
+} from "@/lib/validation/schemas";
 import { ELIGIBILITY_TYPES } from "@/types/firestore";
 
 export interface RaffleFormValues {
@@ -49,43 +52,46 @@ export const emptyRaffleForm: RaffleFormValues = {
   maxEntriesPerUser: "1",
 };
 
-function toInput(values: RaffleFormValues): RaffleCreateInput | null {
-  try {
-    return raffleCreateSchema.parse({
-      basicInfo: {
-        name: values.name,
-        shortDescription: values.shortDescription,
-        fullDescription: values.fullDescription,
-      },
-      schedule: {
-        timezone: values.timezone,
-        registrationStart: new Date(values.registrationStart),
-        registrationEnd: new Date(values.registrationEnd),
-        drawAt: new Date(values.drawAt),
-      },
-      payment: {
-        entryFee: Number(values.entryFee),
-        currency: values.currency,
-        bankName: values.bankName,
-        accountName: values.accountName,
-        accountNumber: values.accountNumber,
-        instructions: values.instructions,
-      },
-      eligibility: {
-        type: values.eligibilityType,
-        ...(values.eligibilityGroupLabel
-          ? { groupLabel: values.eligibilityGroupLabel }
-          : {}),
-        description: values.eligibilityDescription,
-      },
-      entryConfig: {
-        allowMultipleEntries: values.allowMultipleEntries,
-        maxEntriesPerUser: values.allowMultipleEntries ? Number(values.maxEntriesPerUser) : 1,
-      },
-    });
-  } catch {
-    return null;
+function toInput(values: RaffleFormValues): { data: RaffleCreateInput; error: null } | { data: null; error: string } {
+  const result = raffleCreateSchema.safeParse({
+    basicInfo: {
+      name: values.name,
+      shortDescription: values.shortDescription,
+      fullDescription: values.fullDescription,
+    },
+    schedule: {
+      timezone: values.timezone,
+      registrationStart: new Date(values.registrationStart),
+      registrationEnd: new Date(values.registrationEnd),
+      drawAt: new Date(values.drawAt),
+    },
+    payment: {
+      entryFee: Number(values.entryFee),
+      currency: values.currency,
+      bankName: values.bankName,
+      accountName: values.accountName,
+      accountNumber: values.accountNumber,
+      instructions: values.instructions,
+    },
+    eligibility: {
+      type: values.eligibilityType,
+      ...(values.eligibilityGroupLabel
+        ? { groupLabel: values.eligibilityGroupLabel }
+        : {}),
+      description: values.eligibilityDescription,
+    },
+    entryConfig: {
+      allowMultipleEntries: values.allowMultipleEntries,
+      maxEntriesPerUser: values.allowMultipleEntries
+        ? Number(values.maxEntriesPerUser)
+        : 1,
+    },
+  });
+  if (!result.success) {
+    const issue = result.error.issues[0];
+    return { data: null, error: issue ? `${issue.path.join(".")}: ${issue.message}` : "Invalid form data." };
   }
+  return { data: result.data, error: null };
 }
 
 export function RaffleForm({
@@ -103,21 +109,24 @@ export function RaffleForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  function set<K extends keyof RaffleFormValues>(key: K, value: RaffleFormValues[K]) {
+  function set<K extends keyof RaffleFormValues>(
+    key: K,
+    value: RaffleFormValues[K],
+  ) {
     setValues((v) => ({ ...v, [key]: value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = toInput(values);
-    if (!parsed) {
-      setError("Check the form for errors — all required fields must be valid.");
+    if (!parsed.data) {
+      setError(parsed.error);
       return;
     }
     setError(null);
     setSubmitting(true);
     try {
-      await onSubmit(parsed);
+      await onSubmit(parsed.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -130,7 +139,13 @@ export function RaffleForm({
       {error && <Alert tone="error">{error}</Alert>}
 
       <Section title="Basic information">
-        <Input label="Raffle name" required value={values.name} onChange={(e) => set("name", e.target.value)} disabled={disabled} />
+        <Input
+          label="Raffle name"
+          required
+          value={values.name}
+          onChange={(e) => set("name", e.target.value)}
+          disabled={disabled}
+        />
         <Textarea
           label="Short description"
           hint="Shown on raffle cards. Keep it under 280 characters."
@@ -160,36 +175,117 @@ export function RaffleForm({
           disabled={disabled}
         />
         <div className="grid gap-4 sm:grid-cols-3">
-          <Input label="Registration start" type="datetime-local" required value={values.registrationStart} onChange={(e) => set("registrationStart", e.target.value)} disabled={disabled} />
-          <Input label="Registration end" type="datetime-local" required value={values.registrationEnd} onChange={(e) => set("registrationEnd", e.target.value)} disabled={disabled} />
-          <Input label="Draw date & time" type="datetime-local" required value={values.drawAt} onChange={(e) => set("drawAt", e.target.value)} disabled={disabled} />
+          <Input
+            label="Registration start"
+            type="datetime-local"
+            required
+            value={values.registrationStart}
+            onChange={(e) => set("registrationStart", e.target.value)}
+            disabled={disabled}
+          />
+          <Input
+            label="Registration end"
+            type="datetime-local"
+            required
+            value={values.registrationEnd}
+            onChange={(e) => set("registrationEnd", e.target.value)}
+            disabled={disabled}
+          />
+          <Input
+            label="Draw date & time"
+            type="datetime-local"
+            required
+            value={values.drawAt}
+            onChange={(e) => set("drawAt", e.target.value)}
+            disabled={disabled}
+          />
         </div>
       </Section>
 
       <Section title="Payment">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Entry fee (whole Naira)" type="number" min={1} required value={values.entryFee} onChange={(e) => set("entryFee", e.target.value)} disabled={disabled} />
-          <Input label="Currency" required value={values.currency} onChange={(e) => set("currency", e.target.value.toUpperCase())} disabled={disabled} />
+          <Input
+            label="Entry fee (whole Naira)"
+            type="number"
+            min={1}
+            required
+            value={values.entryFee}
+            onChange={(e) => set("entryFee", e.target.value)}
+            disabled={disabled}
+          />
+          <Input
+            label="Currency"
+            required
+            value={values.currency}
+            onChange={(e) => set("currency", e.target.value.toUpperCase())}
+            disabled={disabled}
+          />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Input label="Bank name" required value={values.bankName} onChange={(e) => set("bankName", e.target.value)} disabled={disabled} />
-          <Input label="Account name" required value={values.accountName} onChange={(e) => set("accountName", e.target.value)} disabled={disabled} />
+          <Input
+            label="Bank name"
+            required
+            value={values.bankName}
+            onChange={(e) => set("bankName", e.target.value)}
+            disabled={disabled}
+          />
+          <Input
+            label="Account name"
+            required
+            value={values.accountName}
+            onChange={(e) => set("accountName", e.target.value)}
+            disabled={disabled}
+          />
         </div>
-        <Input label="Account number" required value={values.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} disabled={disabled} />
-        <Textarea label="Payment instructions" rows={3} value={values.instructions} onChange={(e) => set("instructions", e.target.value)} disabled={disabled} />
+        <Input
+          label="Account number"
+          required
+          value={values.accountNumber}
+          onChange={(e) => set("accountNumber", e.target.value)}
+          disabled={disabled}
+        />
+        <Textarea
+          label="Payment instructions"
+          rows={3}
+          value={values.instructions}
+          onChange={(e) => set("instructions", e.target.value)}
+          disabled={disabled}
+        />
       </Section>
 
       <Section title="Eligibility">
-        <Select label="Who can enter" required value={values.eligibilityType} onChange={(e) => set("eligibilityType", e.target.value as RaffleFormValues["eligibilityType"])} disabled={disabled}>
+        <Select
+          label="Who can enter"
+          required
+          value={values.eligibilityType}
+          onChange={(e) =>
+            set(
+              "eligibilityType",
+              e.target.value as RaffleFormValues["eligibilityType"],
+            )
+          }
+          disabled={disabled}
+        >
           <option value="everyone">Everyone</option>
           <option value="employees_only">Employees only</option>
           <option value="customers_only">Customers only</option>
           <option value="specific_group">Specific group</option>
         </Select>
         {values.eligibilityType === "specific_group" && (
-          <Input label="Group label" value={values.eligibilityGroupLabel} onChange={(e) => set("eligibilityGroupLabel", e.target.value)} disabled={disabled} />
+          <Input
+            label="Group label"
+            value={values.eligibilityGroupLabel}
+            onChange={(e) => set("eligibilityGroupLabel", e.target.value)}
+            disabled={disabled}
+          />
         )}
-        <Textarea label="Eligibility notes (shown to participants)" rows={2} value={values.eligibilityDescription} onChange={(e) => set("eligibilityDescription", e.target.value)} disabled={disabled} />
+        <Textarea
+          label="Eligibility notes (shown to participants)"
+          rows={2}
+          value={values.eligibilityDescription}
+          onChange={(e) => set("eligibilityDescription", e.target.value)}
+          disabled={disabled}
+        />
       </Section>
 
       <Section title="Entries">
@@ -220,7 +316,13 @@ export function RaffleForm({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-4 rounded-2xl border border-neutral-200 p-5">
       <h2 className="font-semibold text-neutral-900">{title}</h2>

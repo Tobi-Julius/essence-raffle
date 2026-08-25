@@ -7,9 +7,11 @@ const ALLOWED_TAGS = [
 ];
 
 /**
- * Renders Tiptap-authored rich text. Content is sanitized both at write
- * time (Cloud Function, on terms create/publish) and again here at render
- * time, defense-in-depth against any HTML injection.
+ * Renders Tiptap-authored rich text. This is now the ONLY sanitization
+ * boundary — there is no server-side re-sanitization pass on write anymore
+ * (terms create/publish is a plain admin-authenticated client write, not a
+ * Cloud Function). Only admins can write terms content, so the residual
+ * risk is a compromised admin session, not an arbitrary client.
  */
 export function SanitizedHtml({ html, className }: { html: string; className?: string }) {
   const clean = DOMPurify.sanitize(html, {

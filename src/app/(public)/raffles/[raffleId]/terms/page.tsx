@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 import { useRaffleBundle } from "@/hooks/useRaffleBundle";
 import { useAuth } from "@/hooks/useAuth";
-import { registerForRaffle } from "@/services/callables";
+import { registerForRaffle } from "@/services/registration";
 import { toFriendlyError } from "@/lib/errors";
 import { useToast } from "@/components/ui/Toast";
 
@@ -67,12 +67,15 @@ export default function RaffleTermsPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await registerForRaffle({
-        raffleId: raffle!.id,
-        termsId: terms!.id,
-        termsVersion: terms!.version,
-        termsAccepted: true,
-      });
+      const result = await registerForRaffle(
+        {
+          raffleId: raffle!.id,
+          termsId: terms!.id,
+          termsVersion: terms!.version,
+          termsAccepted: true,
+        },
+        user!.uid,
+      );
       show("success", "You're registered! Complete your payment to secure your entry.");
       router.push(`/dashboard/raffles/${raffle!.id}?paymentId=${result.paymentId}`);
     } catch (e) {

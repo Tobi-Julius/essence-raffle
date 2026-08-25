@@ -13,11 +13,12 @@ import { auth, db } from "@/lib/firebase/client";
 import type { RegisterInput } from "@/lib/validation/schemas";
 
 /**
- * Registration creates the Firebase Auth user AND the mirrored Firestore
- * profile document. The role is always "participant" here — role is never
- * client-settable; elevating a user to admin/super_admin is exclusively done
- * via the `setUserRole` Cloud Function callable by a super admin, which also
- * sets the custom claim used by security rules.
+ * Registration creates the Firebase Auth user AND the Firestore profile
+ * document that IS their role record (see firestore.rules' myRole()). The
+ * role is always "participant" here, and firestore.rules' create rule
+ * forces that — a client can never self-assign a role. Elevating a user to
+ * admin/super_admin is exclusively done via setUserRole
+ * (src/services/users.ts), super-admin only.
  */
 export async function registerUser(input: RegisterInput): Promise<void> {
   const credential = await createUserWithEmailAndPassword(

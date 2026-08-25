@@ -12,11 +12,9 @@ import type { Payment, Raffle } from "@/types/firestore";
 export function LivePaymentCard({
   paymentId,
   raffle,
-  userId,
 }: {
   paymentId: string;
   raffle: Raffle;
-  userId: string;
 }) {
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -31,5 +29,5 @@ export function LivePaymentCard({
 
   if (!loaded) return <Skeleton className="h-64 w-full rounded-2xl" />;
   if (!payment) return <EmptyState title="Payment details unavailable" description="This payment couldn't be loaded." />;
-  return <PaymentCard payment={payment} raffle={raffle} userId={userId} />;
+  return <PaymentCard payment={payment} raffle={raffle} />;
 }

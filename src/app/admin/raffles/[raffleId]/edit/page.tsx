@@ -7,10 +7,10 @@ import { RaffleSubNav } from "@/components/admin/RaffleSubNav";
 import { RaffleForm, type RaffleFormValues } from "@/components/admin/RaffleForm";
 import { PageSpinner } from "@/components/ui/Spinner";
 import { Alert } from "@/components/ui/Alert";
-import { FileUpload } from "@/components/ui/FileUpload";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import { useAdminRaffle } from "@/hooks/useAdminRaffle";
 import { updateDraftRaffle, updateRaffleMedia } from "@/services/raffles";
-import { uploadRaffleBanner } from "@/services/storage";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
 import { toDate } from "@/lib/utils/dates";
@@ -26,22 +26,24 @@ export default function EditRafflePage() {
   const router = useRouter();
   const { raffle, loading, refresh } = useAdminRaffle(params.raffleId);
   const { show } = useToast();
-  const [bannerProgress, setBannerProgress] = useState<number | null>(null);
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [savingBanner, setSavingBanner] = useState(false);
 
   if (loading) return <PageSpinner />;
   if (!raffle) return <Alert tone="error">Raffle not found.</Alert>;
 
-  async function handleBanner(file: File) {
+  async function handleBanner() {
+    if (!bannerUrl.trim()) return;
+    setSavingBanner(true);
     try {
-      const { done } = uploadRaffleBanner(raffle!.id, file, setBannerProgress);
-      const { path, url } = await done;
-      await updateRaffleMedia(raffle!.id, { bannerPath: path, bannerUrl: url });
+      await updateRaffleMedia(raffle!.id, { bannerUrl: bannerUrl.trim() });
       show("success", "Banner updated.");
+      setBannerUrl("");
       refresh();
     } catch (e) {
       show("error", toFriendlyError(e));
     } finally {
-      setBannerProgress(null);
+      setSavingBanner(false);
     }
   }
 
@@ -84,13 +86,19 @@ export default function EditRafflePage() {
                 <Image src={raffle.bannerUrl} alt="" fill className="object-cover" />
               </div>
             )}
-            <FileUpload
-              label={raffle.bannerUrl ? "Replace banner" : "Upload banner"}
-              hint="JPG, PNG, or WEBP — up to 5MB"
-              accept="image/jpeg,image/png,image/webp"
-              onSelect={handleBanner}
-              progress={bannerProgress}
-            />
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Input
+                  label="Banner image URL"
+                  placeholder="https://…"
+                  value={bannerUrl}
+                  onChange={(e) => setBannerUrl(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleBanner} loading={savingBanner} disabled={!bannerUrl.trim()}>
+                Save
+              </Button>
+            </div>
           </div>
         </div>
         {!editable && (

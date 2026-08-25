@@ -50,7 +50,6 @@ async function upsertAuthUser(
       emailVerified: true,
     });
   }
-  await auth.setCustomUserClaims(user.uid, { role });
   await db.collection("users").doc(user.uid).set(
     {
       fullName: displayName,
@@ -112,9 +111,7 @@ async function seedPrize(
     raffleId,
     name,
     description,
-    imagePath: null,
     imageUrl: null,
-    videoPath: null,
     videoUrl: null,
     value,
     currency: "NGN",
@@ -338,10 +335,8 @@ async function main() {
       currency: "NGN",
       paymentMethod: "bank_transfer",
       reference: `RFL-${new Date().getFullYear()}-SEED${sequence}`,
-      receiptPath: null,
       status: "approved",
       refundStatus: "none",
-      submittedAt: Timestamp.now(),
       reviewedAt: Timestamp.now(),
       reviewedBy: adminUid,
       rejectionReason: null,

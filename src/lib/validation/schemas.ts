@@ -131,21 +131,6 @@ export const registerForRaffleSchema = z.object({
 });
 export type RegisterForRaffleInput = z.infer<typeof registerForRaffleSchema>;
 
-export const ACCEPTED_RECEIPT_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "application/pdf",
-] as const;
-export const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024; // 8MB
-
-export const submitReceiptSchema = z.object({
-  paymentId: z.string().trim().min(1),
-  receiptPath: z.string().trim().min(1),
-  mimeType: z.enum(ACCEPTED_RECEIPT_MIME_TYPES),
-  sizeBytes: z.number().int().positive().max(MAX_RECEIPT_SIZE_BYTES),
-});
-export type SubmitReceiptInput = z.infer<typeof submitReceiptSchema>;
-
 export const reviewPaymentSchema = z.object({
   paymentId: z.string().trim().min(1),
   decision: z.enum(["approve", "reject"]),

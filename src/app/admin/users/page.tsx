@@ -7,8 +7,7 @@ import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/hooks/useAuth";
 import { canManageAdmins } from "@/lib/permissions";
-import { listAllUsers, searchUsersByEmail } from "@/services/users";
-import { setUserRole, setUserActive } from "@/services/callables";
+import { listAllUsers, searchUsersByEmail, setUserRole, setUserActive } from "@/services/users";
 import { useToast } from "@/components/ui/Toast";
 import { toFriendlyError } from "@/lib/errors";
 import type { UserProfile, UserRole } from "@/types/firestore";
@@ -42,7 +41,7 @@ export default function AdminUsersPage() {
             value={u.role}
             onChange={async (e) => {
               try {
-                await setUserRole({ userId: u.id, role: e.target.value as UserRole });
+                await setUserRole(u.id, e.target.value as UserRole);
                 show("success", `${u.fullName} is now ${e.target.value.replace("_", " ")}.`);
                 load();
               } catch (err) {
@@ -75,7 +74,7 @@ export default function AdminUsersPage() {
             variant="outline"
             onClick={async () => {
               try {
-                await setUserActive({ userId: u.id, isActive: !u.isActive });
+                await setUserActive(u.id, !u.isActive);
                 show("success", u.isActive ? "User deactivated." : "User reactivated.");
                 load();
               } catch (err) {

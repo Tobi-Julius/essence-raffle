@@ -8,9 +8,9 @@ import { PageSpinner } from "@/components/ui/Spinner";
 
 /**
  * Client-side route protection. This gates UI rendering only — it is a UX
- * layer, not a security boundary. The actual boundary is Firestore/Storage
- * security rules and Cloud Function authorization checks, which apply
- * regardless of what this component does or whether JavaScript runs at all.
+ * layer, not a security boundary. The actual boundary is firestore.rules,
+ * which applies regardless of what this component does or whether
+ * JavaScript runs at all.
  */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();

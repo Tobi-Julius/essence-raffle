@@ -4,46 +4,13 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
-import { FileUpload } from "@/components/ui/FileUpload";
 import { PaymentTimeline } from "@/components/payment/PaymentTimeline";
 import { PaymentStatusBadge } from "@/components/ui/Badge";
 import { formatMoney } from "@/lib/utils/money";
-import { toFriendlyError } from "@/lib/errors";
-import { uploadReceipt } from "@/services/storage";
-import { submitReceipt } from "@/services/callables";
-import { FileValidationError } from "@/services/storage";
+import { whatsappLink } from "@/lib/utils/whatsapp";
 import type { Payment, Raffle } from "@/types/firestore";
-import { useToast } from "@/components/ui/Toast";
 
-export function PaymentCard({ payment, raffle, userId }: { payment: Payment; raffle: Raffle; userId: string }) {
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { show } = useToast();
-
-  async function handleFileSelect(file: File) {
-    setError(null);
-    try {
-      setFileName(file.name);
-      setUploading(true);
-      const { done } = uploadReceipt(raffle.id, userId, payment.id, file, setProgress);
-      const path = await done;
-      await submitReceipt({ paymentId: payment.id, receiptPath: path, mimeType: file.type as never, sizeBytes: file.size });
-      show("success", "Receipt submitted for verification.");
-    } catch (e) {
-      if (e instanceof FileValidationError) {
-        setError(e.message);
-      } else {
-        setError(toFriendlyError(e));
-      }
-      setFileName(null);
-    } finally {
-      setUploading(false);
-      setProgress(null);
-    }
-  }
-
+export function PaymentCard({ payment, raffle }: { payment: Payment; raffle: Raffle }) {
   const [copied, setCopied] = useState(false);
   function copyReference() {
     navigator.clipboard.writeText(payment.reference);
@@ -52,6 +19,7 @@ export function PaymentCard({ payment, raffle, userId }: { payment: Payment; raf
   }
 
   const showBankDetails = payment.status === "pending" || payment.status === "rejected";
+  const proofLink = whatsappLink(`Payment proof for reference ${payment.reference}`);
 
   return (
     <Card>
@@ -61,7 +29,7 @@ export function PaymentCard({ payment, raffle, userId }: { payment: Payment; raf
           <PaymentStatusBadge status={payment.status} />
         </div>
 
-        <PaymentTimeline paymentStatus={payment.status} hasReceipt={!!payment.receiptPath} />
+        <PaymentTimeline paymentStatus={payment.status} />
 
         {payment.status === "rejected" && payment.rejectionReason && (
           <Alert tone="error" title="Payment could not be verified">
@@ -72,12 +40,6 @@ export function PaymentCard({ payment, raffle, userId }: { payment: Payment; raf
         {payment.status === "approved" && (
           <Alert tone="success" title="You're officially entered">
             Your payment was approved and your entry is confirmed.
-          </Alert>
-        )}
-
-        {payment.status === "verification_pending" && (
-          <Alert tone="warning" title="Payment verification pending">
-            Our team is reviewing your receipt. This usually takes a short while.
           </Alert>
         )}
 
@@ -104,17 +66,25 @@ export function PaymentCard({ payment, raffle, userId }: { payment: Payment; raf
         )}
 
         {showBankDetails && (
-          <FileUpload
-            label="Upload payment receipt"
-            hint="JPG, PNG, or PDF — up to 8MB"
-            accept="image/jpeg,image/png,application/pdf"
-            onSelect={handleFileSelect}
-            error={error ?? undefined}
-            progress={uploading ? progress ?? 0 : null}
-            selectedFileName={fileName}
-            onRemove={() => setFileName(null)}
-            disabled={uploading}
-          />
+          <div className="rounded-xl border border-neutral-200 p-4 text-sm">
+            <p className="mb-1 font-medium text-neutral-800">Send your payment proof</p>
+            <p className="mb-3 text-neutral-500">
+              After transferring, send a screenshot of your receipt to our WhatsApp with your payment
+              reference — our team verifies it there and approves your entry.
+            </p>
+            {proofLink ? (
+              <a
+                href={proofLink}
+                target="_blank"
+                rel="noreferrer"
+                className="focus-ring inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 active:bg-brand-800"
+              >
+                Send proof on WhatsApp
+              </a>
+            ) : (
+              <p className="text-neutral-400">WhatsApp support isn&apos;t configured yet.</p>
+            )}
+          </div>
         )}
       </CardBody>
     </Card>

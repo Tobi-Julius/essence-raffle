@@ -27,7 +27,6 @@ interface Row {
 const statusOptions: (EntryStatus | "all")[] = [
   "all",
   "payment_pending",
-  "verification_pending",
   "eligible",
   "rejected",
   "disqualified",

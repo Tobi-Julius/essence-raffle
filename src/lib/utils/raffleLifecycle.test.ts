@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeLifecycleStatus } from "./schedule";
-import type { RaffleSchedule } from "./types";
+import { computeLifecycleStatus } from "./raffleLifecycle";
+import type { RaffleSchedule } from "@/types/firestore";
 
 function fakeTimestamp(date: Date) {
   return { toDate: () => date } as unknown as RaffleSchedule["registrationStart"];

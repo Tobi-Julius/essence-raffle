@@ -50,7 +50,6 @@ export function RaffleStatusBadge({ status }: { status: RaffleStatus }) {
 
 const paymentStatusTone: Record<PaymentStatus, Tone> = {
   pending: "neutral",
-  verification_pending: "warning",
   approved: "success",
   rejected: "error",
 };
@@ -61,7 +60,6 @@ export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
 
 const entryStatusTone: Record<EntryStatus, Tone> = {
   payment_pending: "neutral",
-  verification_pending: "warning",
   eligible: "success",
   rejected: "error",
   cancelled: "neutral",

@@ -3,7 +3,6 @@ import {
   raffleEntryConfigSchema,
   registerSchema,
   reviewPaymentSchema,
-  submitReceiptSchema,
   rafflePaymentSchema,
 } from "./schemas";
 
@@ -65,38 +64,6 @@ describe("rafflePaymentSchema", () => {
       instructions: "",
     });
     expect(result.success).toBe(false);
-  });
-});
-
-describe("submitReceiptSchema", () => {
-  it("rejects a file over the 8MB limit", () => {
-    const result = submitReceiptSchema.safeParse({
-      paymentId: "pay_1",
-      receiptPath: "receipts/r1/u1/pay_1/receipt.jpg",
-      mimeType: "image/jpeg",
-      sizeBytes: 9 * 1024 * 1024,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects an unsupported mime type", () => {
-    const result = submitReceiptSchema.safeParse({
-      paymentId: "pay_1",
-      receiptPath: "receipts/r1/u1/pay_1/receipt.gif",
-      mimeType: "image/gif",
-      sizeBytes: 1000,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("accepts a valid PDF receipt", () => {
-    const result = submitReceiptSchema.safeParse({
-      paymentId: "pay_1",
-      receiptPath: "receipts/r1/u1/pay_1/receipt.pdf",
-      mimeType: "application/pdf",
-      sizeBytes: 1000,
-    });
-    expect(result.success).toBe(true);
   });
 });
 

@@ -110,7 +110,7 @@ describeIfEmulator("firestore.rules", () => {
         entryId: "entry-1",
         amount: 2000,
         currency: "NGN",
-        status: "verification_pending",
+        status: "pending",
       });
     });
     const db = participant().firestore();
@@ -125,7 +125,7 @@ describeIfEmulator("firestore.rules", () => {
         entryId: "entry-1",
         amount: 2000,
         currency: "NGN",
-        status: "verification_pending",
+        status: "pending",
       });
     });
     const db = admin().firestore();
