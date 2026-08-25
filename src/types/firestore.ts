@@ -186,6 +186,7 @@ export interface RaffleEligibility {
 export interface RaffleEntryConfig {
   allowMultipleEntries: boolean;
   maxEntriesPerUser: number; // 1 when allowMultipleEntries is false
+  maxParticipants: number; // registration cap, checked against stats.paymentsApproved
 }
 
 export interface RaffleStats {

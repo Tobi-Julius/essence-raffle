@@ -66,7 +66,9 @@ export default function RaffleDetailsPage() {
   }
 
   const activeEntry = myEntries?.find((e) => !["cancelled", "rejected"].includes(e.status));
+  const isFull = raffle.stats.paymentsApproved >= (raffle.entryConfig.maxParticipants ?? Infinity);
   const canEnterMore =
+    !isFull &&
     raffle.entryConfig.allowMultipleEntries &&
     (myEntries?.filter((e) => e.status !== "cancelled" && e.status !== "rejected").length ?? 0) <
       raffle.entryConfig.maxEntriesPerUser;
@@ -169,6 +171,7 @@ export default function RaffleDetailsPage() {
                 raffle={raffle}
                 activeEntry={activeEntry}
                 canEnterMore={canEnterMore}
+                isFull={isFull}
                 signedIn={!!user}
                 onEnter={() => router.push(user ? `/raffles/${raffle.id}/terms` : `/login?redirect=/raffles/${raffle.id}/terms`)}
                 onManage={() => router.push(`/dashboard/raffles/${raffle.id}`)}
@@ -211,6 +214,7 @@ function CtaPanel({
   raffle,
   activeEntry,
   canEnterMore,
+  isFull,
   signedIn,
   onEnter,
   onManage,
@@ -218,6 +222,7 @@ function CtaPanel({
   raffle: import("@/types/firestore").Raffle;
   activeEntry?: RaffleEntry;
   canEnterMore: boolean;
+  isFull: boolean;
   signedIn: boolean;
   onEnter: () => void;
   onManage: () => void;
@@ -246,6 +251,14 @@ function CtaPanel({
   }
   if (raffle.status === "DRAWING") {
     return <Alert tone="warning" title="Drawing in progress">Registration has closed — the draw is underway.</Alert>;
+  }
+
+  if (isFull && !activeEntry) {
+    return (
+      <Alert tone="warning" title="Raffle full">
+        This raffle has reached its maximum number of participants and is no longer accepting entries.
+      </Alert>
+    );
   }
 
   // OPEN

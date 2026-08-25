@@ -94,6 +94,10 @@ export default function AdminRaffleOverviewPage() {
                 value={String(raffle.stats.disqualifiedEntries)}
               />
               <Fact
+                label="Max participants"
+                value={`${raffle.stats.paymentsApproved} / ${raffle.entryConfig.maxParticipants ?? "∞"}`}
+              />
+              <Fact
                 label="Registration window"
                 value={`${formatInRaffleTimezone(raffle.schedule.registrationStart, raffle.schedule.timezone, "d MMM")} – ${formatInRaffleTimezone(raffle.schedule.registrationEnd, raffle.schedule.timezone, "d MMM")}`}
               />

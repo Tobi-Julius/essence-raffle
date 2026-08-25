@@ -66,6 +66,11 @@ export async function registerForRaffle(
         const terms = termsSnap.data();
 
         if (raffle.status !== "OPEN") throw new AppError("This raffle is not currently accepting entries.");
+        // ?? Infinity: raffles created before maxParticipants existed have no cap.
+        const maxParticipants = raffle.entryConfig.maxParticipants ?? Infinity;
+        if (raffle.stats.paymentsApproved >= maxParticipants) {
+          throw new AppError("This raffle has reached its maximum number of participants.");
+        }
         const now = new Date();
         if (now < raffle.schedule.registrationStart.toDate()) throw new AppError("Registration has not opened yet.");
         if (now > raffle.schedule.registrationEnd.toDate()) throw new AppError("Registration has closed.");

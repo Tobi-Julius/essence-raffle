@@ -68,6 +68,7 @@ export default function EditRafflePage() {
     eligibilityDescription: raffle.eligibility.description,
     allowMultipleEntries: raffle.entryConfig.allowMultipleEntries,
     maxEntriesPerUser: String(raffle.entryConfig.maxEntriesPerUser),
+    maxParticipants: raffle.entryConfig.maxParticipants ? String(raffle.entryConfig.maxParticipants) : "",
   };
 
   return (

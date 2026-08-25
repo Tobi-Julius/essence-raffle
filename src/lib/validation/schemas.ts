@@ -90,6 +90,7 @@ export const raffleEntryConfigSchema = z
   .object({
     allowMultipleEntries: z.boolean().default(false),
     maxEntriesPerUser: z.number().int().min(1).max(100).default(1),
+    maxParticipants: z.number().int().positive("Maximum participants must be a positive whole number"),
   })
   .refine((v) => v.allowMultipleEntries || v.maxEntriesPerUser === 1, {
     message: "Single-entry raffles must cap maxEntriesPerUser at 1",
