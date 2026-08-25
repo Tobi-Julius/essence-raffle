@@ -111,10 +111,10 @@ export async function reviewPayment(
     const entry = entrySnap.data() as RaffleEntry;
 
     if (input.decision === "approve" && payment.status === "approved") {
-      return { paymentId: payment.id, status: "approved" as const, entryNumber: entry.entryNumber };
+      return { paymentId: input.paymentId, status: "approved" as const, entryNumber: entry.entryNumber };
     }
     if (input.decision === "reject" && payment.status === "rejected") {
-      return { paymentId: payment.id, status: "rejected" as const };
+      return { paymentId: input.paymentId, status: "rejected" as const };
     }
     if (payment.status !== "pending") {
       throw new AppError("This payment is not awaiting verification.");
@@ -143,10 +143,10 @@ export async function reviewPayment(
         actorId,
         actorRole,
         raffleId: payment.raffleId,
-        targetId: payment.id,
+        targetId: input.paymentId,
         timestamp: serverTimestamp(),
       });
-      return { paymentId: payment.id, status: "approved" as const, entryNumber: entry.entryNumber };
+      return { paymentId: input.paymentId, status: "approved" as const, entryNumber: entry.entryNumber };
     }
 
     tx.update(paymentRef, {
@@ -170,10 +170,10 @@ export async function reviewPayment(
       actorId,
       actorRole,
       raffleId: payment.raffleId,
-      targetId: payment.id,
+      targetId: input.paymentId,
       timestamp: serverTimestamp(),
       metadata: { reason: input.rejectionReason },
     });
-    return { paymentId: payment.id, status: "rejected" as const };
+    return { paymentId: input.paymentId, status: "rejected" as const };
   });
 }
