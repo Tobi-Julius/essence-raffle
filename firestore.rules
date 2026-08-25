@@ -143,9 +143,13 @@ service cloud.firestore {
           && resource.data.status == request.resource.data.status
           && unchangedExcept(['stats', 'hasWinner', 'currentWinnerEntryId', 'updatedAt']))
         // I. Registration stats bump — participant-triggered, exactly +1 on
-        // exactly these two counters, nothing else in stats moves.
+        // exactly these two counters, nothing else in stats moves. Blocked
+        // once approved participants have reached the raffle's cap.
         || (isSignedIn()
           && resource.data.status == request.resource.data.status
+          // .get() with a default avoids denying every registration on
+          // raffles created before maxParticipants existed on entryConfig.
+          && resource.data.stats.paymentsApproved < resource.data.entryConfig.get('maxParticipants', 999999999)
           && request.resource.data.stats.totalRegistrations == resource.data.stats.totalRegistrations + 1
           && request.resource.data.stats.paymentsPending == resource.data.stats.paymentsPending + 1
           && request.resource.data.stats.paymentsApproved == resource.data.stats.paymentsApproved

@@ -29,6 +29,7 @@ export interface RaffleFormValues {
   eligibilityDescription: string;
   allowMultipleEntries: boolean;
   maxEntriesPerUser: string;
+  maxParticipants: string;
 }
 
 export const emptyRaffleForm: RaffleFormValues = {
@@ -50,6 +51,7 @@ export const emptyRaffleForm: RaffleFormValues = {
   eligibilityDescription: "",
   allowMultipleEntries: false,
   maxEntriesPerUser: "1",
+  maxParticipants: "",
 };
 
 function toInput(values: RaffleFormValues): { data: RaffleCreateInput; error: null } | { data: null; error: string } {
@@ -85,6 +87,7 @@ function toInput(values: RaffleFormValues): { data: RaffleCreateInput; error: nu
       maxEntriesPerUser: values.allowMultipleEntries
         ? Number(values.maxEntriesPerUser)
         : 1,
+      maxParticipants: Number(values.maxParticipants),
     },
   });
   if (!result.success) {
@@ -289,6 +292,16 @@ export function RaffleForm({
       </Section>
 
       <Section title="Entries">
+        <Input
+          label="Maximum number of participants"
+          hint="Registration closes once this many approved participants have joined, regardless of the registration window."
+          type="number"
+          min={1}
+          required
+          value={values.maxParticipants}
+          onChange={(e) => set("maxParticipants", e.target.value)}
+          disabled={disabled}
+        />
         <Checkbox
           label="Allow multiple entries per participant"
           checked={values.allowMultipleEntries}

@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarClock, Ticket } from "lucide-react";
-import { Card } from "@/components/ui/Card";
 import { RaffleStatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatMoney } from "@/lib/utils/money";
@@ -28,7 +27,7 @@ function ctaFor(raffle: Raffle): { label: string; disabled?: boolean } {
 export function RaffleCard({ raffle }: { raffle: Raffle }) {
   const cta = ctaFor(raffle);
   return (
-    <Card className="flex flex-col overflow-hidden">
+    <Link className="flex flex-col overflow-hidden" href={`/raffles/${raffle.id}`}>
       <div className="relative h-40 w-full bg-brand-100">
         {raffle.bannerUrl ? (
           <Image src={raffle.bannerUrl} alt="" fill className="object-cover" />
@@ -56,13 +55,13 @@ export function RaffleCard({ raffle }: { raffle: Raffle }) {
         </div>
         <div className="mt-auto flex items-center justify-between pt-2">
           <span className="font-semibold text-brand-700">{formatMoney(raffle.payment.entryFee, raffle.payment.currency)}</span>
-          <Link href={`/raffles/${raffle.id}`}>
+         
             <Button size="sm" disabled={cta.disabled}>
               {cta.label}
             </Button>
-          </Link>
+         
         </div>
       </div>
-    </Card>
+    </Link>
   );
 }

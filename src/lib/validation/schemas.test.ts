@@ -31,13 +31,30 @@ describe("registerSchema", () => {
 
 describe("raffleEntryConfigSchema", () => {
   it("rejects maxEntriesPerUser > 1 when multiple entries are disallowed", () => {
-    const result = raffleEntryConfigSchema.safeParse({ allowMultipleEntries: false, maxEntriesPerUser: 3 });
+    const result = raffleEntryConfigSchema.safeParse({
+      allowMultipleEntries: false,
+      maxEntriesPerUser: 3,
+      maxParticipants: 100,
+    });
     expect(result.success).toBe(false);
   });
 
   it("accepts maxEntriesPerUser > 1 when multiple entries are allowed", () => {
-    const result = raffleEntryConfigSchema.safeParse({ allowMultipleEntries: true, maxEntriesPerUser: 5 });
+    const result = raffleEntryConfigSchema.safeParse({
+      allowMultipleEntries: true,
+      maxEntriesPerUser: 5,
+      maxParticipants: 100,
+    });
     expect(result.success).toBe(true);
+  });
+
+  it("requires a positive maxParticipants", () => {
+    const result = raffleEntryConfigSchema.safeParse({
+      allowMultipleEntries: false,
+      maxEntriesPerUser: 1,
+      maxParticipants: 0,
+    });
+    expect(result.success).toBe(false);
   });
 });
 

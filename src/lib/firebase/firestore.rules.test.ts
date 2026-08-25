@@ -199,6 +199,33 @@ describeIfEmulator("firestore.rules", () => {
     await assertFails(deleteDoc(doc(participant().firestore(), "entries/entry-1")));
   });
 
+  it("blocks registration once approved participants have reached the raffle's cap", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "raffles/raffle-1"), {
+        name: "Full Raffle",
+        status: "OPEN",
+        createdBy: "admin-1",
+        hasWinner: false,
+        entryConfig: { allowMultipleEntries: false, maxEntriesPerUser: 1, maxParticipants: 1 },
+        stats: {
+          totalRegistrations: 1,
+          paymentsPending: 0,
+          paymentsApproved: 1,
+          paymentsRejected: 0,
+          eligibleEntries: 1,
+          disqualifiedEntries: 0,
+        },
+      });
+    });
+    const db = participant().firestore();
+    await assertFails(
+      updateDoc(doc(db, "raffles/raffle-1"), {
+        "stats.totalRegistrations": 2,
+        "stats.paymentsPending": 1,
+      }),
+    );
+  });
+
   it("lets a participant read only their own entry, not someone else's", async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), "entries/entry-1"), { userId: "participant-1", raffleId: "raffle-1" });

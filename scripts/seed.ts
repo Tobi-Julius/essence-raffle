@@ -165,7 +165,7 @@ async function main() {
       type: "everyone" as const,
       description: "Open to everyone.",
     },
-    entryConfig: { allowMultipleEntries: true, maxEntriesPerUser: 5 },
+    entryConfig: { allowMultipleEntries: true, maxEntriesPerUser: 5, maxParticipants: 200 },
     activeTermsId: null as string | null,
     activeTermsVersion: null as number | null,
     hasWinner: false,
