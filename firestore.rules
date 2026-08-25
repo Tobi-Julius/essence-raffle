@@ -89,11 +89,20 @@ service cloud.firestore {
         && request.resource.data.hasWinner == false
         && request.resource.data.stats.totalRegistrations == 0;
 
-      allow update: if
+      // Admin branches (A-H) are gated behind a SINGLE isAdmin() call rather
+      // than one per branch: empirically, against the live project, having
+      // several separate isAdmin()-calling `allow update` branches/statements
+      // (even split into fully separate `allow update` statements) caused
+      // Firestore to deny the unrelated, isAdmin()-free branch I (the
+      // participant registration write) below — reproduced repeatedly via
+      // direct writes against the live project. A single isAdmin() call site
+      // resolved it. Root cause not confirmed (suspected undocumented
+      // per-rule-evaluation cost/limit around repeated get()-calling
+      // branches), but this structure is verified reliable.
+      allow update: if isAdmin() && (
         // A. Content edits — admin, only while DRAFT/UPCOMING, status itself
         // unchanged in this branch.
-        (isAdmin()
-          && resource.data.status == request.resource.data.status
+        (resource.data.status == request.resource.data.status
           && resource.data.status in ['DRAFT', 'UPCOMING']
           && unchangedExcept([
             'name', 'nameLower', 'slug', 'shortDescription', 'fullDescription',
@@ -101,62 +110,57 @@ service cloud.firestore {
             'schedule', 'payment', 'eligibility', 'entryConfig', 'updatedAt'
           ]))
         // B. Terms pointer — set by the publishTerms client flow, any status.
-        || (isAdmin()
-          && resource.data.status == request.resource.data.status
+        || (resource.data.status == request.resource.data.status
           && unchangedExcept(['activeTermsId', 'activeTermsVersion', 'updatedAt']))
         // C. Publish — DRAFT -> UPCOMING/OPEN/DRAWING (whichever the
         // registration window is already in at publish time), requires a
         // prize to exist. The admin-only UI checklist also requires active
         // terms; this rule adds a server-side backstop for the prize half
         // of that check.
-        || (isAdmin()
-          && resource.data.status == 'DRAFT'
+        || (resource.data.status == 'DRAFT'
           && request.resource.data.status in ['UPCOMING', 'OPEN', 'DRAWING']
           && exists(/databases/$(database)/documents/prizes/$(raffleId))
           && unchangedExcept(['status', 'updatedAt']))
         // D. Cancel — any non-terminal status -> CANCELLED.
-        || (isAdmin()
-          && resource.data.status in ['DRAFT', 'UPCOMING', 'OPEN', 'DRAWING']
+        || (resource.data.status in ['DRAFT', 'UPCOMING', 'OPEN', 'DRAWING']
           && request.resource.data.status == 'CANCELLED'
           && unchangedExcept(['status', 'updatedAt']))
         // E/F. Lifecycle sweep — no Cloud Scheduler on Spark, so an admin's
         // own browser (useRaffleStatusSweep) performs these once the
         // relevant window has passed, per request.time (server-authoritative).
-        || (isAdmin()
-          && resource.data.status == 'UPCOMING'
+        || (resource.data.status == 'UPCOMING'
           && request.resource.data.status == 'OPEN'
           && request.time >= resource.data.schedule.registrationStart
           && unchangedExcept(['status', 'updatedAt']))
-        || (isAdmin()
-          && resource.data.status == 'OPEN'
+        || (resource.data.status == 'OPEN'
           && request.resource.data.status == 'DRAWING'
           && request.time >= resource.data.schedule.registrationEnd
           && unchangedExcept(['status', 'updatedAt']))
         // G. Draw completion — DRAWING -> COMPLETED, winner fields + stats.
-        || (isAdmin()
-          && resource.data.status == 'DRAWING'
+        || (resource.data.status == 'DRAWING'
           && request.resource.data.status == 'COMPLETED'
           && unchangedExcept(['status', 'hasWinner', 'currentWinnerEntryId', 'stats', 'updatedAt']))
         // H. Admin-triggered stat/winner adjustments with status unchanged —
         // payment review, disqualify, redraw.
-        || (isAdmin()
-          && resource.data.status == request.resource.data.status
+        || (resource.data.status == request.resource.data.status
           && unchangedExcept(['stats', 'hasWinner', 'currentWinnerEntryId', 'updatedAt']))
-        // I. Registration stats bump — participant-triggered, exactly +1 on
-        // exactly these two counters, nothing else in stats moves. Blocked
-        // once approved participants have reached the raffle's cap.
-        || (isSignedIn()
-          && resource.data.status == request.resource.data.status
-          // .get() with a default avoids denying every registration on
-          // raffles created before maxParticipants existed on entryConfig.
-          && resource.data.stats.paymentsApproved < resource.data.entryConfig.get('maxParticipants', 999999999)
-          && request.resource.data.stats.totalRegistrations == resource.data.stats.totalRegistrations + 1
-          && request.resource.data.stats.paymentsPending == resource.data.stats.paymentsPending + 1
-          && request.resource.data.stats.paymentsApproved == resource.data.stats.paymentsApproved
-          && request.resource.data.stats.paymentsRejected == resource.data.stats.paymentsRejected
-          && request.resource.data.stats.eligibleEntries == resource.data.stats.eligibleEntries
-          && request.resource.data.stats.disqualifiedEntries == resource.data.stats.disqualifiedEntries
-          && unchangedExcept(['stats', 'updatedAt']));
+      );
+
+      // I. Registration stats bump — participant-triggered, exactly +1 on
+      // exactly these two counters, nothing else in stats moves. Blocked
+      // once approved participants have reached the raffle's cap.
+      allow update: if isSignedIn()
+        && resource.data.status == request.resource.data.status
+        // .get() with a default avoids denying every registration on
+        // raffles created before maxParticipants existed on entryConfig.
+        && resource.data.stats.paymentsApproved < resource.data.entryConfig.get('maxParticipants', 999999999)
+        && request.resource.data.stats.totalRegistrations == resource.data.stats.totalRegistrations + 1
+        && request.resource.data.stats.paymentsPending == resource.data.stats.paymentsPending + 1
+        && request.resource.data.stats.paymentsApproved == resource.data.stats.paymentsApproved
+        && request.resource.data.stats.paymentsRejected == resource.data.stats.paymentsRejected
+        && request.resource.data.stats.eligibleEntries == resource.data.stats.eligibleEntries
+        && request.resource.data.stats.disqualifiedEntries == resource.data.stats.disqualifiedEntries
+        && unchangedExcept(['stats', 'updatedAt']);
 
       allow delete: if isAdmin() && resource.data.status == 'DRAFT';
 

@@ -25,18 +25,28 @@ interface Row {
   email: string;
 }
 
-const statusOptions: (PaymentStatus | "all")[] = ["all", "pending", "approved", "rejected"];
+const statusOptions: (PaymentStatus | "all")[] = [
+  "all",
+  "pending",
+  "approved",
+  "rejected",
+];
 
 export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
   const { user, role } = useAuth();
   const [status, setStatus] = useState<PaymentStatus | "all">("pending");
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
-  const [cursor, setCursor] = useState<QueryDocumentSnapshot<Payment> | null>(null);
-  const [history, setHistory] = useState<(QueryDocumentSnapshot<Payment> | null)[]>([null]);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot<Payment> | null>(
+    null,
+  );
+  const [history, setHistory] = useState<
+    (QueryDocumentSnapshot<Payment> | null)[]
+  >([null]);
   const [pageIndex, setPageIndex] = useState(0);
   const [viewing, setViewing] = useState<Row | null>(null);
   const [rejecting, setRejecting] = useState<Row | null>(null);
+  const [approving, setApproving] = useState(false);
   const { show } = useToast();
 
   useEffect(() => {
@@ -46,9 +56,21 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
 
   async function load() {
     setRows(null);
-    const page = await listPaymentsForQueue({ raffleId, status, cursor: history[pageIndex] });
-    const profiles = await Promise.all(page.payments.map((p) => getUserProfile(p.userId)));
-    setRows(page.payments.map((payment, i) => ({ payment, name: profiles[i]?.fullName ?? "—", email: profiles[i]?.email ?? "—" })));
+    const page = await listPaymentsForQueue({
+      raffleId,
+      status,
+      cursor: history[pageIndex],
+    });
+    const profiles = await Promise.all(
+      page.payments.map((p) => getUserProfile(p.userId)),
+    );
+    setRows(
+      page.payments.map((payment, i) => ({
+        payment,
+        name: profiles[i]?.fullName ?? "—",
+        email: profiles[i]?.email ?? "—",
+      })),
+    );
     setCursor(page.cursor);
   }
 
@@ -63,13 +85,20 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
 
   async function handleApprove(row: Row) {
     if (!user || !role) return;
+    setApproving(true);
     try {
-      await reviewPayment({ paymentId: row.payment.id, decision: "approve" }, user.uid, role);
+      await reviewPayment(
+        { paymentId: row.payment.id, decision: "approve" },
+        user.uid,
+        role,
+      );
       show("success", `Payment approved — entry ${row.name} is now confirmed.`);
-      load();
       setViewing(null);
+      load();
     } catch (e) {
       show("error", toFriendlyError(e));
+    } finally {
+      setApproving(false);
     }
   }
 
@@ -80,14 +109,36 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
           r.email.toLowerCase().includes(search.toLowerCase()) ||
           r.payment.reference.toLowerCase().includes(search.toLowerCase()),
       )
-    : rows ?? [];
+    : (rows ?? []);
 
   const columns: Column<Row>[] = [
-    { header: "Participant", key: "name", render: (r) => <span>{r.name}</span> },
-    { header: "Reference", key: "ref", render: (r) => <span className="font-mono text-xs">{r.payment.reference}</span> },
-    { header: "Amount", key: "amount", render: (r) => formatMoney(r.payment.amount, r.payment.currency) },
-    { header: "Status", key: "status", render: (r) => <PaymentStatusBadge status={r.payment.status} /> },
-    { header: "Submitted", key: "submitted", render: (r) => formatDateTime(r.payment.createdAt) },
+    {
+      header: "Participant",
+      key: "name",
+      render: (r) => <span>{r.name}</span>,
+    },
+    {
+      header: "Reference",
+      key: "ref",
+      render: (r) => (
+        <span className="font-mono text-xs">{r.payment.reference}</span>
+      ),
+    },
+    {
+      header: "Amount",
+      key: "amount",
+      render: (r) => formatMoney(r.payment.amount, r.payment.currency),
+    },
+    {
+      header: "Status",
+      key: "status",
+      render: (r) => <PaymentStatusBadge status={r.payment.status} />,
+    },
+    {
+      header: "Submitted",
+      key: "submitted",
+      render: (r) => formatDateTime(r.payment.createdAt),
+    },
     {
       header: "",
       key: "actions",
@@ -104,7 +155,11 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
     <div>
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-56">
-          <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value as PaymentStatus | "all")}>
+          <Select
+            label="Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as PaymentStatus | "all")}
+          >
             {statusOptions.map((s) => (
               <option key={s} value={s}>
                 {s === "all" ? "All statuses" : s.replace(/_/g, " ")}
@@ -113,12 +168,23 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
           </Select>
         </div>
         <div className="w-64">
-          <Input label="Search" placeholder="Name, email, or reference" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input
+            label="Search"
+            placeholder="Name, email, or reference"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
 
       <div className="mt-4">
-        <DataTable columns={columns} rows={filtered} rowKey={(r) => r.payment.id} loading={rows === null} emptyTitle="No payments match this filter" />
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(r) => r.payment.id}
+          loading={rows === null}
+          emptyTitle="No payments match this filter"
+        />
       </div>
 
       {!search && (
@@ -138,15 +204,28 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
         open={!!viewing}
         onClose={() => setViewing(null)}
         title="Review payment"
-        description={viewing ? `${viewing.name} · ${formatMoney(viewing.payment.amount, viewing.payment.currency)}` : undefined}
+        description={
+          viewing
+            ? `${viewing.name} · ${formatMoney(viewing.payment.amount, viewing.payment.currency)}`
+            : undefined
+        }
         size="lg"
         footer={
           viewing?.payment.status === "pending" ? (
             <>
-              <Button variant="danger" onClick={() => setRejecting(viewing)}>
+              <Button
+                variant="danger"
+                onClick={() => setRejecting(viewing)}
+                disabled={approving}
+              >
                 Reject
               </Button>
-              <Button onClick={() => viewing && handleApprove(viewing)}>Approve</Button>
+              <Button
+                onClick={() => viewing && handleApprove(viewing)}
+                loading={approving}
+              >
+                Approve
+              </Button>
             </>
           ) : undefined
         }
@@ -156,19 +235,36 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <Field label="Reference" value={viewing.payment.reference} />
               <Field label="Email" value={viewing.email} />
-              <Field label="Amount" value={formatMoney(viewing.payment.amount, viewing.payment.currency)} />
-              <Field label="Submitted" value={formatDateTime(viewing.payment.createdAt)} />
+              <Field
+                label="Amount"
+                value={formatMoney(
+                  viewing.payment.amount,
+                  viewing.payment.currency,
+                )}
+              />
+              <Field
+                label="Submitted"
+                value={formatDateTime(viewing.payment.createdAt)}
+              />
             </dl>
             {viewing.payment.rejectionReason && (
-              <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">Rejected: {viewing.payment.rejectionReason}</p>
+              <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                Rejected: {viewing.payment.rejectionReason}
+              </p>
             )}
             <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               Verify this payment&apos;s proof on WhatsApp before approving.
-              {whatsappLink(`Payment proof for reference ${viewing.payment.reference}`) && (
+              {whatsappLink(
+                `Payment proof for reference ${viewing.payment.reference}`,
+              ) && (
                 <>
                   {" "}
                   <a
-                    href={whatsappLink(`Payment proof for reference ${viewing.payment.reference}`)!}
+                    href={
+                      whatsappLink(
+                        `Payment proof for reference ${viewing.payment.reference}`,
+                      )!
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="font-medium underline"
@@ -194,7 +290,11 @@ export function PaymentsQueue({ raffleId }: { raffleId?: string }) {
         onConfirm={async (reason) => {
           if (!rejecting || !user || !role) return;
           await reviewPayment(
-            { paymentId: rejecting.payment.id, decision: "reject", rejectionReason: reason },
+            {
+              paymentId: rejecting.payment.id,
+              decision: "reject",
+              rejectionReason: reason,
+            },
             user.uid,
             role,
           );
