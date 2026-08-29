@@ -141,9 +141,14 @@ service cloud.firestore {
           && request.resource.data.status == 'COMPLETED'
           && unchangedExcept(['status', 'hasWinner', 'currentWinnerEntryId', 'stats', 'updatedAt']))
         // H. Admin-triggered stat/winner adjustments with status unchanged —
-        // payment review, disqualify, redraw.
+        // payment review, disqualify, redraw. A payment approval that would
+        // push paymentsApproved past the raffle's cap is rejected here too,
+        // mirroring branch I's registration-time check — the client-side
+        // check in reviewPayment (src/services/payments.ts) is UX only.
         || (resource.data.status == request.resource.data.status
-          && unchangedExcept(['stats', 'hasWinner', 'currentWinnerEntryId', 'updatedAt']))
+          && unchangedExcept(['stats', 'hasWinner', 'currentWinnerEntryId', 'updatedAt'])
+          && (request.resource.data.stats.paymentsApproved <= resource.data.stats.paymentsApproved
+            || request.resource.data.stats.paymentsApproved <= resource.data.entryConfig.get('maxParticipants', 999999999)))
       );
 
       // I. Registration stats bump — participant-triggered, exactly +1 on

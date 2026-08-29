@@ -18,6 +18,13 @@ export function PaymentCard({ payment, raffle }: { payment: Payment; raffle: Raf
     setTimeout(() => setCopied(false), 1500);
   }
 
+  const [accountNumberCopied, setAccountNumberCopied] = useState(false);
+  function copyAccountNumber() {
+    navigator.clipboard.writeText(raffle.payment.accountNumber);
+    setAccountNumberCopied(true);
+    setTimeout(() => setAccountNumberCopied(false), 1500);
+  }
+
   const showBankDetails = payment.status === "pending" || payment.status === "rejected";
   const proofLink = whatsappLink(`Payment proof for reference ${payment.reference}`);
 
@@ -49,7 +56,19 @@ export function PaymentCard({ payment, raffle }: { payment: Payment; raffle: Raf
             <dl className="space-y-1.5">
               <Row label="Bank" value={raffle.payment.bankName} />
               <Row label="Account name" value={raffle.payment.accountName} />
-              <Row label="Account number" value={raffle.payment.accountNumber} />
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <dt className="text-neutral-500">Account number</dt>
+                <dd className="flex items-center gap-1.5 font-medium text-neutral-900">
+                  {raffle.payment.accountNumber}
+                  <button
+                    onClick={copyAccountNumber}
+                    aria-label="Copy account number"
+                    className="focus-ring rounded p-1 text-neutral-400 hover:text-neutral-700"
+                  >
+                    {accountNumberCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </dd>
+              </div>
               <Row label="Amount" value={formatMoney(payment.amount, payment.currency)} />
               <div className="flex items-center justify-between gap-2 py-0.5">
                 <dt className="text-neutral-500">Payment reference</dt>

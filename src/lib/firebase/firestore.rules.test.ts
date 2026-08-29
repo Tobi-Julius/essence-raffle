@@ -226,6 +226,33 @@ describeIfEmulator("firestore.rules", () => {
     );
   });
 
+  it("blocks an admin from approving a payment past the raffle's participant cap", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "raffles/raffle-1"), {
+        name: "Full Raffle",
+        status: "OPEN",
+        createdBy: "admin-1",
+        hasWinner: false,
+        entryConfig: { allowMultipleEntries: false, maxEntriesPerUser: 1, maxParticipants: 1 },
+        stats: {
+          totalRegistrations: 2,
+          paymentsPending: 2,
+          paymentsApproved: 1,
+          paymentsRejected: 0,
+          eligibleEntries: 1,
+          disqualifiedEntries: 0,
+        },
+      });
+    });
+    await assertFails(
+      updateDoc(doc(admin().firestore(), "raffles/raffle-1"), {
+        "stats.paymentsPending": 1,
+        "stats.paymentsApproved": 2,
+        "stats.eligibleEntries": 2,
+      }),
+    );
+  });
+
   it("lets a participant read only their own entry, not someone else's", async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), "entries/entry-1"), { userId: "participant-1", raffleId: "raffle-1" });

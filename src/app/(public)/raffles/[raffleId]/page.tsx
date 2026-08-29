@@ -250,7 +250,14 @@ function CtaPanel({
     );
   }
   if (raffle.status === "DRAWING") {
-    return <Alert tone="warning" title="Drawing in progress">Registration has closed — the draw is underway.</Alert>;
+    return (
+      <>
+        <Alert tone="warning" title="Drawing in progress">Registration has closed — the draw is underway.</Alert>
+        <Link href={`/draw/${raffle.id}`} target="_blank">
+          <Button className="w-full">Enter Draw</Button>
+        </Link>
+      </>
+    );
   }
 
   if (isFull && !activeEntry) {
