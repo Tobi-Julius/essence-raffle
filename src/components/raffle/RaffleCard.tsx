@@ -12,7 +12,7 @@ function ctaFor(raffle: Raffle): { label: string; disabled?: boolean } {
     case "OPEN":
       return { label: "Enter Raffle" };
     case "DRAWING":
-      return { label: "Drawing Soon" };
+      return { label: "Enter Draw" };
     case "UPCOMING":
       return { label: "Coming Soon" };
     case "COMPLETED":

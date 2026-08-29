@@ -121,6 +121,12 @@ export async function reviewPayment(
     }
 
     if (input.decision === "approve") {
+      const raffle = raffleSnap.data();
+      // ?? Infinity: raffles created before maxParticipants existed have no cap.
+      const maxParticipants = raffle.entryConfig.maxParticipants ?? Infinity;
+      if (raffle.stats.paymentsApproved >= maxParticipants) {
+        throw new AppError("This raffle has already reached its maximum number of participants.");
+      }
       tx.update(paymentRef, {
         status: "approved",
         reviewedAt: serverTimestamp(),
