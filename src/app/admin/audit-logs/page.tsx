@@ -41,7 +41,7 @@ export default function AuditLogsPage() {
   ];
 
   return (
-    <div>
+    <div className="max-sm:max-w-90">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Audit logs</h1>

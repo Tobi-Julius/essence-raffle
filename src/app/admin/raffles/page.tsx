@@ -80,18 +80,18 @@ export default function AdminRafflesPage() {
   ];
 
   return (
-    <div>
+    <div className="max-sm:max-w-88">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900">Raffles</h1>
           <p className="mt-1 text-sm text-neutral-500">Create and manage every raffle on the platform.</p>
         </div>
         <Link href="/admin/raffles/create">
-          <Button>+ New raffle</Button>
+          <Button className="max-sm:text-xs max-sm:w-27">+ New raffle</Button>
         </Link>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 max-w-full max-sm:block">
         <DataTable
           columns={columns}
           rows={raffles ?? []}
