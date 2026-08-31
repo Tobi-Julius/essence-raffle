@@ -40,7 +40,7 @@ export default function AdminOverviewPage() {
           <h1 className="text-2xl font-semibold text-neutral-900">Overview</h1>
           <p className="mt-1 text-sm text-neutral-500">A snapshot of every raffle on the platform.</p>
         </div>
-        <Link href="/admin/raffles/create" className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700">
+        <Link href="/admin/raffles/create" className="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 max-sm:text-xs max-sm:w-30">
           + New raffle
         </Link>
       </div>
