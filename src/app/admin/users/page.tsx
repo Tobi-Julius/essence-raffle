@@ -89,7 +89,7 @@ export default function AdminUsersPage() {
   ];
 
   return (
-    <div>
+    <div className="max-sm:max-w-89">
       <h1 className="text-2xl font-semibold text-neutral-900">Users</h1>
       <p className="mt-1 text-sm text-neutral-500">
         {canManage ? "Manage roles and account status." : "Only super admins can change roles or deactivate accounts."}
